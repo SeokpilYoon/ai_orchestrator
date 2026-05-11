@@ -22,7 +22,32 @@ app.add_typer(providers_app, name="providers")
 
 
 # ---------------------------------------------------------------------------
-# version
+# Root callback: --version
+# ---------------------------------------------------------------------------
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def _root(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show devforge version and exit.",
+    ),
+) -> None:
+    """AI Dev Orchestrator — orchestrate Claude Code / Codex as bounded workers."""
+    # Eager --version callback prints and exits; otherwise pass through to subcommand.
+    _ = version
+
+
+# ---------------------------------------------------------------------------
+# version (subcommand)
 # ---------------------------------------------------------------------------
 
 @app.command()

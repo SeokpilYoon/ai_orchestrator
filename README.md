@@ -49,6 +49,8 @@ suite's gating and Tier A / Tier B split.
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Policy gates, secret scanner, judge decision matrix |
 | [`docs/REAL_PROVIDER_SMOKE.md`](docs/REAL_PROVIDER_SMOKE.md) | Opt-in real-CLI smoke tests |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Implemented vs planned vs out-of-scope |
+| [`CHANGELOG.md`](CHANGELOG.md) | Per-release changes |
+| [`docs/RELEASE_NOTES.md`](docs/RELEASE_NOTES.md) | Install / verify / known limitations for the current release |
 
 ## Frozen specs
 

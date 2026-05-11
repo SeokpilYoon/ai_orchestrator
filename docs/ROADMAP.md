@@ -17,14 +17,14 @@ These DEVF tasks pass tests and are wired into the CLI:
 | Routing & coordination | 050, 051, 052, 053, 054 | role router (incl. capability filtering), failure classifier, fallback executor, tournament mode, candidate comparison |
 | Report polish | 081 | `devforge report` markdown / json / state output |
 | Tests | 090, 091, 092, 093 | unit suite, mock integration suite, opt-in real provider smoke, security regression |
+| Packaging | 095 | wheel/sdist build via `pyproject.toml`, console-script entry point, `devforge --version` + `devforge version`, `CHANGELOG.md`, `docs/RELEASE_NOTES.md`. PyPI publish is **not implemented yet** (see below) |
 
 ## Partial
 
 | Area | DEVF | Gap |
 |---|---|---|
 | Directory layout | 002 | `devforge/dashboard/` directory does not exist yet |
-| Documentation | 094 | covered by this cycle; future expansion (HOWTOs, tutorials) deferred |
-| Packaging | 095 | `pyproject.toml` + console-script entry point work; `CHANGELOG.md` and release notes not written |
+| Documentation | 094 | covered by an earlier cycle; future expansion (HOWTOs, tutorials) deferred |
 
 ## Not implemented yet
 
@@ -39,6 +39,7 @@ These DEVF tasks pass tests and are wired into the CLI:
 | Claude Agent SDK provider | (architecture §5.5) | same — `providers.claude_agent_sdk` falls back to the Claude CLI adapter |
 | mypy strict pass | — | currently `mypy` runs in non-strict mode; type coverage is partial |
 | CI for real provider smoke | — | opt-in suite is local-only; no automated runner for `pytest -m real_provider` |
+| PyPI publish | post-095 | the release process is editable install + local wheel build; no automated upload pipeline yet |
 
 ## Out of scope
 

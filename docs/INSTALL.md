@@ -64,6 +64,21 @@ If a CLI isn't installed, the corresponding row will show
 | `.orchestrator/worktrees/<id>/` | per-candidate git worktrees | no |
 | `_workspace/` | harness scratch / notes | no (except its README) |
 
+## Building a wheel
+
+```bash
+python -m pip wheel . --no-deps -w /tmp/devforge-wheel-test
+ls /tmp/devforge-wheel-test/devforge-0.0.1-*.whl
+```
+
+The wheel is self-contained — the runtime dependencies (`typer`,
+`pydantic`, `pyyaml`) are already declared in `pyproject.toml`. Build
+artifacts (`dist/`, `build/`, `*.egg-info/`) are gitignored, so you can
+build into the repo or into `/tmp/...` without worrying about commits.
+
+For per-release detail see [`../CHANGELOG.md`](../CHANGELOG.md) and
+[`RELEASE_NOTES.md`](RELEASE_NOTES.md).
+
 ## Next steps
 
 - [`CONFIG.md`](CONFIG.md) — what each `devforge.yaml` section means
