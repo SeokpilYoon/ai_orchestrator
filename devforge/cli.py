@@ -128,12 +128,19 @@ def run(
     typer.echo(f"Created run: {ctx.run_id}")
     typer.echo(f"Run directory: {ctx.root}")
 
-    # Stage execution is wired in stages/* — invoked here once feature workflow lands.
-    # For MVP-1 we hand off to a minimal driver:
+    # Route through WorkflowEngine so every run records state (DEVF-012/013).
     try:
-        from devforge.stages.feature_driver import run_feature_workflow
+        from devforge.core.workflow_engine import WorkflowEngine, WorkflowLoadError
 
-        run_feature_workflow(cfg, ctx, implementer, reviewer)
+        engine = WorkflowEngine(cfg, ctx)
+        engine.run(
+            workflow,
+            implementer_override=implementer,
+            reviewer_override=reviewer,
+        )
+    except WorkflowLoadError as exc:
+        typer.echo(f"Workflow error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
     except Exception as exc:  # pragma: no cover - driver may be partial during dev
         typer.echo(f"Workflow driver error: {exc}", err=True)
         raise typer.Exit(code=3) from exc
@@ -197,11 +204,35 @@ def report(
 
     final_md = target / "final_report.md"
     decision = target / "decision.json"
+
+    from devforge.core.state_store import StateStore
+
+    state = StateStore(target)
+    summary_line = state.summary_line()
+
     if fmt == "json" and decision.exists():
+        if summary_line:
+            typer.echo(f"# {summary_line}")
         typer.echo(decision.read_text(encoding="utf-8"))
+    elif fmt == "state":
+        if summary_line:
+            typer.echo(summary_line)
+            try:
+                import json as _json
+
+                typer.echo(_json.dumps(state.load_run(), indent=2, ensure_ascii=False))
+            except Exception:
+                pass
+        else:
+            typer.echo(f"Run {target.name} has no state recorded.")
     elif final_md.exists():
+        if summary_line:
+            typer.echo(summary_line)
+            typer.echo("")
         typer.echo(final_md.read_text(encoding="utf-8"))
     else:
+        if summary_line:
+            typer.echo(summary_line)
         typer.echo(f"Run {target.name} has not produced a report yet.")
 
 

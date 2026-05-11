@@ -1,4 +1,8 @@
 workflow: feature
+# This workflow definition lists the high-level stages that ``WorkflowEngine``
+# records in ``state/steps.json``. The implementer stage is a *composite* —
+# it encompasses implement + validate + review + judge per candidate, plus
+# the revision loop (DEVF-045) and fallback chain (DEVF-052).
 stages:
   - id: normalize_task
     role: technical_planner
@@ -18,20 +22,12 @@ stages:
   - id: implement_candidates
     role: implementer
     mode: tournament
-    output: candidate_patches
+    composite: true
+    output: candidate_summaries
 
-  - id: run_validation
-    type: local_evaluator
-    output: validation.json
-
-  - id: cross_review
-    role: reviewer
-    strategy: reviewer_not_same_as_implementer
-    output: review.json
-
-  - id: judge
-    type: deterministic_plus_llm
-    output: decision.json
+  - id: comparison_report
+    type: local_writer
+    output: comparison.md
 
   - id: final_report
     type: local_writer
