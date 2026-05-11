@@ -14,7 +14,7 @@ These DEVF tasks pass tests and are wired into the CLI:
 | Git / validation | 030, 031, 032 | worktree manager, diff collector, validation runner |
 | Policy / evaluation | 033, 034, 035, 036, 037, 038 | file policy, command policy, secret scanner, test mutation checker, score calculator, judge |
 | Feature workflow stages | 040, 041, 042, 043, 044, 045, 046 | task normalizer, repo context collector, plan generator, implementer + reviewer stages, revision loop, final report |
-| App-from-PRD foundation | 060, 061, 062, 063 | PRD intake, requirements schema, MVP scope freeze, UX flow / screen inventory; `devforge create-app` writes the planning artifacts |
+| App-from-PRD foundation | 060, 061, 062, 063, 064 | PRD intake, requirements schema, MVP scope freeze, UX flow / screen inventory, architecture generator (architecture.md / data_model.md / api_contract.yaml / tech_stack.md). Planning artifacts only — no scaffold yet |
 | Routing & coordination | 050, 051, 052, 053, 054 | role router (incl. capability filtering), failure classifier, fallback executor, tournament mode, candidate comparison |
 | Report polish | 081 | `devforge report` markdown / json / state output |
 | Tests | 090, 091, 092, 093 | unit suite, mock integration suite, opt-in real provider smoke, security regression |
@@ -31,7 +31,7 @@ These DEVF tasks pass tests and are wired into the CLI:
 
 | Area | DEVF | Status |
 |---|---|---|
-| App-from-PRD downstream stages | 064 – 071 | architecture generator, scaffold generator, vertical slice planner/implementer, backlog loop, acceptance coverage, and app release packaging are not built yet |
+| App-from-PRD downstream stages | 065 – 071 | scaffold generator, vertical slice planner/implementer, backlog loop, acceptance coverage, and app release packaging are not built yet |
 | SQLite state store | 080 | runs persist as JSON under `.orchestrator/runs/<id>/state/`; SQLite indexing is a future swap |
 | Local dashboard backend | 082 | no FastAPI/web layer yet |
 | Local dashboard frontend | 083 | no React/TUI yet |

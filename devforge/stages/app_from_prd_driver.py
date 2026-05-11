@@ -18,6 +18,14 @@ from typing import Any
 from devforge.core.config_loader import DevforgeConfig
 from devforge.core.run_context import RunContext
 from devforge.core.state_store import StateStore
+from devforge.stages.architecture_generator import (
+    Architecture,
+    build_architecture,
+    save_api_contract,
+    save_architecture,
+    save_data_model,
+    save_tech_stack,
+)
 from devforge.stages.mvp_scope import MvpScope, freeze_mvp_scope, save_mvp_scope
 from devforge.stages.prd_intake import (
     PrdIntake,
@@ -47,6 +55,7 @@ _STAGE_IDS = [
     "requirements_inventory",
     "mvp_scope_freeze",
     "ux_flow_inventory",
+    "architecture_design",
 ]
 
 
@@ -125,7 +134,22 @@ def run_app_from_prd_workflow(
         "ux_flow_inventory", "completed", artifact_ref="screen_inventory.json"
     )
 
-    _write_final_report(run_ctx, intake, reqs, scope, inventory)
+    # Stage 5: architecture_design (DEVF-064)
+    state_store.save_step("architecture_design", "running")
+    stack = str(run_ctx.metadata.get("stack", "python-fastapi-only"))
+    project_name = cfg.project.name or "app"
+    arch = build_architecture(
+        reqs, intake, scope, inventory, stack, project_name=project_name
+    )
+    save_architecture(arch, run_ctx.root / "architecture.md")
+    save_data_model(arch, run_ctx.root / "data_model.md")
+    save_api_contract(arch, run_ctx.root / "api_contract.yaml")
+    save_tech_stack(arch, run_ctx.root / "tech_stack.md")
+    state_store.save_step(
+        "architecture_design", "completed", artifact_ref="architecture.md"
+    )
+
+    _write_final_report(run_ctx, intake, reqs, scope, inventory, arch)
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +177,7 @@ def _write_final_report(
     reqs: Requirements,
     scope: MvpScope,
     inventory: UxInventory | None = None,
+    arch: Architecture | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append(f"# Final Report — run {run_ctx.run_id}")
@@ -191,6 +216,22 @@ def _write_final_report(
             lines.append(f"- Surface kinds: {', '.join(kinds)}")
         lines.append("")
 
+    if arch is not None:
+        lines.append("## Architecture")
+        lines.append("")
+        lines.append(
+            f"- Stack: `{arch.stack}` "
+            f"({'supported' if arch.supported_stack else 'planned'})"
+        )
+        lines.append(f"- Runtime: {arch.runtime}")
+        lines.append(f"- Framework: {arch.framework}")
+        lines.append(f"- Persistence: {arch.persistence}")
+        lines.append(
+            f"- Entities: **{len(arch.entities)}**, "
+            f"API operations: **{len(arch.operations)}**"
+        )
+        lines.append("")
+
     lines.append("## Artifacts")
     lines.append("")
     for name in (
@@ -203,6 +244,10 @@ def _write_final_report(
         "screen_inventory.json",
         "user_flows.md",
         "navigation_map.md",
+        "architecture.md",
+        "data_model.md",
+        "api_contract.yaml",
+        "tech_stack.md",
     ):
         if (run_ctx.root / name).exists():
             lines.append(f"- `{name}`")

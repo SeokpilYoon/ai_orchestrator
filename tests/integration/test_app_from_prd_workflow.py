@@ -61,6 +61,10 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
         "screen_inventory.json",
         "user_flows.md",
         "navigation_map.md",
+        "architecture.md",
+        "data_model.md",
+        "api_contract.yaml",
+        "tech_stack.md",
         "final_report.md",
     ):
         assert (ctx.root / name).exists(), f"missing artifact: {name}"
@@ -82,6 +86,14 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
     # Navigation always starts at the synthetic START node.
     assert inventory["navigation"][0][0] == "START"
 
+    # api_contract.yaml must be valid YAML and include the /tasks endpoint.
+    import yaml as _yaml
+    contract = _yaml.safe_load(
+        (ctx.root / "api_contract.yaml").read_text(encoding="utf-8")
+    )
+    assert contract["openapi"].startswith("3.0")
+    assert "/tasks" in contract["paths"]
+
     state = StateStore(ctx.root)
     run = state.load_run()
     assert run["status"] == "completed"
@@ -91,6 +103,7 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
         "requirements_inventory": "completed",
         "mvp_scope_freeze": "completed",
         "ux_flow_inventory": "completed",
+        "architecture_design": "completed",
     }
 
 
@@ -113,6 +126,7 @@ def test_empty_prd_fails_at_intake(tmp_path: Path) -> None:
     assert steps["requirements_inventory"] == "pending"
     assert steps["mvp_scope_freeze"] == "pending"
     assert steps["ux_flow_inventory"] == "pending"
+    assert steps["architecture_design"] == "pending"
 
 
 def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
@@ -134,6 +148,7 @@ def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
     assert steps["requirements_inventory"] == "failed"
     assert steps["mvp_scope_freeze"] == "pending"
     assert steps["ux_flow_inventory"] == "pending"
+    assert steps["architecture_design"] == "pending"
     # PRD intake artifacts still written
     assert (ctx.root / "product_summary.md").exists()
     assert (ctx.root / "ambiguity_log.json").exists()

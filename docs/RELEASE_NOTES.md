@@ -49,14 +49,16 @@ JSON-schema data files declared in `pyproject.toml`. `tests/`,
 
 ## Known limitations
 
-- `devforge create-app` runs the **planning foundation** (DEVF-060/061/062/063)
+- `devforge create-app` runs the **planning foundation** (DEVF-060/061/062/063/064)
   and writes `product_summary.md`, `requirements.json`, `ambiguity_log.json`,
   `assumptions.md`, `out_of_scope.md`, `mvp_scope.md`, `screen_inventory.json`,
-  `user_flows.md`, `navigation_map.md`, and a `final_report.md` to a new run
-  directory. The downstream stages — architecture, scaffold, vertical slice,
-  backlog loop, release packaging (DEVF-064 – 071) — are not yet implemented.
-  The `--stack` flag is recorded in run metadata
-  but does not drive any generator.
+  `user_flows.md`, `navigation_map.md`, `architecture.md`, `data_model.md`,
+  `api_contract.yaml`, `tech_stack.md`, and a `final_report.md` to a new run
+  directory. The downstream stages — scaffold, vertical slice, backlog loop,
+  release packaging (DEVF-065 – 071) — are not yet implemented. Only the
+  `python-fastapi-only` stack has a concrete architecture profile; other
+  values are recorded but marked **planned**. The `--stack` flag does not
+  drive any actual code generator.
 - `openai_api` and `claude_agent_sdk` provider types are accepted by the
   config but the registry delegates them to the CLI adapters as
   placeholders.

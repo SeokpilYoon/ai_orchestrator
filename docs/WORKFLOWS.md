@@ -130,7 +130,7 @@ Tournament mode (`tournament: true` + ≥2 healthy providers):
 
 ## The app_from_prd workflow (foundation)
 
-`devforge create-app --from <prd>.md --stack <name>` runs four deterministic
+`devforge create-app --from <prd>.md --stack <name>` runs five deterministic
 planning stages and writes planning artifacts to a new run directory:
 
 - `prd_intake` → `product_summary.md`, `ambiguity_log.json`,
@@ -143,14 +143,18 @@ planning stages and writes planning artifacts to a new run directory:
   `navigation_map.md` (one surface + flow per FR; surfaces are classified as
   `ui` / `api` / `cli` / `logical` from description keywords — backend-only
   PRDs fall back to `logical`)
+- `architecture_design` → `architecture.md`, `data_model.md`,
+  `api_contract.yaml` (OpenAPI 3.0), `tech_stack.md`. Only the
+  `python-fastapi-only` stack has a concrete profile in this release; other
+  stack values are recorded but marked **planned** in the artifacts.
 
 The PRD is a markdown file with `## Functional requirements`,
 `## Non-functional requirements`, and (optionally) `## Out of scope`
 sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
 
-Subsequent stages (architecture, scaffold, vertical slice, backlog loop,
-release packaging — DEVF-064 to DEVF-071) are **not yet implemented**.
-The `--stack` argument is recorded in run metadata but does not drive any
+Subsequent stages (scaffold, vertical slice, backlog loop, release
+packaging — DEVF-065 to DEVF-071) are **not yet implemented**. The
+`--stack` argument is recorded in run metadata but does not drive any
 generator in this release.
 
 Empty PRDs and PRDs with zero functional requirements abort the workflow:
