@@ -56,6 +56,9 @@ class RoleConfig(BaseModel):
     provider_order: list[str]
     tournament: bool = False
     avoid_same_provider_as_implementer: bool = False
+    # Optional override for capabilities the role needs from its provider.
+    # When empty, ``RoleRouter`` uses a role-specific default (see role_router).
+    required_capabilities: list[str] = Field(default_factory=list)
 
 
 class ValidationCommands(BaseModel):

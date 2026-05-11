@@ -171,10 +171,15 @@ def create_app(
 def report(
     run_id: str | None = typer.Option(None, "--run"),
     latest: bool = typer.Option(False, "--latest"),
-    fmt: str = typer.Option("text", "--format", "-f", help="text|json|markdown"),
+    fmt: str = typer.Option(
+        "text",
+        "--format",
+        "-f",
+        help="text | markdown | json | state (text and markdown are aliases)",
+    ),
     config: Path = typer.Option(Path("devforge.yaml"), "--config", "-c"),
 ) -> None:
-    """Print a run report."""
+    """Print a run report. Defaults to the latest run when --run is omitted."""
     from devforge.core.config_loader import ConfigError, load_config
 
     try:
@@ -184,56 +189,196 @@ def report(
         raise typer.Exit(code=2) from exc
 
     runs_dir = Path(cfg.project.root) / ".orchestrator" / "runs"
-    if not runs_dir.exists():
+    target = _resolve_run_dir(runs_dir, run_id=run_id, latest=latest)
+    if target is None:
         typer.echo("No runs found.")
         raise typer.Exit(code=0)
-
-    target: Path | None = None
-    if latest:
-        runs = sorted(p for p in runs_dir.iterdir() if p.is_dir())
-        target = runs[-1] if runs else None
-    elif run_id:
-        target = runs_dir / run_id
-    else:
-        typer.echo("Provide --run <id> or --latest", err=True)
-        raise typer.Exit(code=2)
-
-    if target is None or not target.exists():
+    if not target.exists():
         typer.echo(f"Run not found: {target}", err=True)
         raise typer.Exit(code=2)
 
-    final_md = target / "final_report.md"
+    if fmt == "json":
+        _emit_json(target)
+    elif fmt == "state":
+        _emit_state(target)
+    elif fmt in ("text", "markdown"):
+        _emit_markdown(target)
+    else:
+        typer.echo(
+            f"Unknown format '{fmt}'. Use text | markdown | json | state.", err=True
+        )
+        raise typer.Exit(code=2)
+
+
+def _resolve_run_dir(
+    runs_dir: Path, *, run_id: str | None, latest: bool
+) -> Path | None:
+    """Pick the run directory for a report. ``run_id`` wins; otherwise the latest run."""
+    if not runs_dir.exists():
+        return None
+    if run_id:
+        return runs_dir / run_id
+    runs = sorted(p for p in runs_dir.iterdir() if p.is_dir())
+    if not runs:
+        return None
+    _ = latest  # explicit intent; report always defaults to latest when --run is omitted
+    return runs[-1]
+
+
+def _emit_json(target: Path) -> None:
+    """Legacy JSON output — emit decision.json verbatim with a state header."""
+    from devforge.core.state_store import StateStore
+
+    state = StateStore(target)
+    summary = state.summary_line()
+    if summary:
+        typer.echo(f"# {summary}")
     decision = target / "decision.json"
+    if decision.exists():
+        typer.echo(decision.read_text(encoding="utf-8"))
+    else:
+        typer.echo("{}")
+
+
+def _emit_state(target: Path) -> None:
+    import contextlib
+    import json as _json
+
+    from devforge.core.state_store import StateStore, StateStoreError
+
+    state = StateStore(target)
+    summary = state.summary_line()
+    if not summary:
+        typer.echo(f"Run {target.name} has no state recorded.")
+        return
+    typer.echo(summary)
+    with contextlib.suppress(StateStoreError):
+        typer.echo(_json.dumps(state.load_run(), indent=2, ensure_ascii=False))
+
+
+def _emit_markdown(target: Path) -> None:
+    """Render a structured markdown report from state + artifacts on disk.
+
+    See docs/plan/03 DEVF-081 — "run 요약과 candidate 비교 출력".
+    """
+    import json as _json
 
     from devforge.core.state_store import StateStore
 
     state = StateStore(target)
-    summary_line = state.summary_line()
+    state_initialized = state.is_initialized()
+    run_meta = state.load_run() if state_initialized else None
+    steps = state.load_steps() if state_initialized else []
+    candidates = state.load_candidates() if state_initialized else []
 
-    if fmt == "json" and decision.exists():
-        if summary_line:
-            typer.echo(f"# {summary_line}")
-        typer.echo(decision.read_text(encoding="utf-8"))
-    elif fmt == "state":
-        if summary_line:
-            typer.echo(summary_line)
-            try:
-                import json as _json
-
-                typer.echo(_json.dumps(state.load_run(), indent=2, ensure_ascii=False))
-            except Exception:
-                pass
-        else:
-            typer.echo(f"Run {target.name} has no state recorded.")
-    elif final_md.exists():
-        if summary_line:
-            typer.echo(summary_line)
-            typer.echo("")
-        typer.echo(final_md.read_text(encoding="utf-8"))
+    lines: list[str] = []
+    workflow = run_meta.get("workflow") if run_meta else "?"
+    lines.append(f"# Run {target.name} — {workflow}")
+    lines.append("")
+    if run_meta:
+        lines.append(f"- Status: **{run_meta.get('status', 'unknown')}**")
+        if run_meta.get("started_at"):
+            lines.append(f"- Started: {run_meta['started_at']}")
+        if run_meta.get("completed_at"):
+            lines.append(f"- Completed: {run_meta['completed_at']}")
+        chosen = run_meta.get("chosen_candidate")
+        if chosen:
+            score_suffix = ""
+            verdict_suffix = ""
+            for c in candidates:
+                if c.get("candidate_id") == chosen:
+                    score_suffix = f", score {float(c.get('score', 0.0)):.1f}"
+                    verdict_suffix = f", decision={c.get('decision', '?')}"
+                    break
+            lines.append(
+                f"- Chosen candidate: **{chosen}**{score_suffix}{verdict_suffix}"
+            )
+        if run_meta.get("error"):
+            lines.append(f"- Error: {run_meta['error']}")
     else:
-        if summary_line:
-            typer.echo(summary_line)
-        typer.echo(f"Run {target.name} has not produced a report yet.")
+        lines.append("- _no recorded state_")
+    lines.append("")
+
+    if steps:
+        done = sum(1 for s in steps if s.get("status") == "completed")
+        lines.append(f"## Steps ({done}/{len(steps)} completed)")
+        lines.append("")
+        for s in steps:
+            status = s.get("status", "?")
+            marker = {
+                "completed": "[x]",
+                "running": "[~]",
+                "failed": "[!]",
+                "skipped": "[-]",
+                "pending": "[ ]",
+            }.get(status, "[?]")
+            note = s.get("note")
+            suffix = f" — {note}" if note else ""
+            lines.append(
+                f"- {marker} {s.get('stage_id', '?'):<24}{status}{suffix}"
+            )
+        lines.append("")
+
+    if candidates:
+        lines.append("## Candidates")
+        lines.append("")
+        lines.append("| Candidate | Provider | Score | Decision |")
+        lines.append("|---|---|---:|---|")
+        for c in sorted(candidates, key=lambda x: x.get("score", 0.0), reverse=True):
+            lines.append(
+                f"| {c.get('candidate_id', '?')} | {c.get('provider_id', '?')} | "
+                f"{float(c.get('score', 0.0)):.1f} | {c.get('decision', '?')} |"
+            )
+        lines.append("")
+
+    fallback_path = target / "fallback_history.json"
+    lines.append("## Fallback history")
+    lines.append("")
+    if fallback_path.exists():
+        try:
+            history = _json.loads(fallback_path.read_text(encoding="utf-8")).get(
+                "history", []
+            )
+        except _json.JSONDecodeError:
+            history = []
+        if history:
+            lines.append("| Provider | Failure class | Error |")
+            lines.append("|---|---|---|")
+            for entry in history:
+                lines.append(
+                    f"| {entry.get('provider', '?')} | "
+                    f"{entry.get('failure_class', '?')} | "
+                    f"{(entry.get('error') or '')[:60]} |"
+                )
+        else:
+            lines.append("_none_")
+    else:
+        lines.append("_none_")
+    lines.append("")
+
+    lines.append("## Artifacts")
+    lines.append("")
+    final_md = target / "final_report.md"
+    decision = target / "decision.json"
+    comparison = target / "comparison.md"
+    failure = target / "failure.json"
+    if final_md.exists():
+        lines.append(f"- Final report: `{final_md.name}`")
+    if decision.exists():
+        lines.append(f"- Decision: `{decision.name}`")
+    if comparison.exists():
+        lines.append(f"- Comparison: `{comparison.name}`")
+    if failure.exists():
+        lines.append(f"- Failure: `{failure.name}`")
+    lines.append("")
+
+    typer.echo("\n".join(lines).rstrip())
+
+    if final_md.exists():
+        typer.echo("")
+        typer.echo("---")
+        typer.echo("")
+        typer.echo(final_md.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
