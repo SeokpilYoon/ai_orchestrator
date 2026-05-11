@@ -130,7 +130,7 @@ Tournament mode (`tournament: true` + ≥2 healthy providers):
 
 ## The app_from_prd workflow (foundation)
 
-`devforge create-app --from <prd>.md --stack <name>` runs three deterministic
+`devforge create-app --from <prd>.md --stack <name>` runs four deterministic
 planning stages and writes planning artifacts to a new run directory:
 
 - `prd_intake` → `product_summary.md`, `ambiguity_log.json`,
@@ -139,15 +139,19 @@ planning stages and writes planning artifacts to a new run directory:
   `docs/plan/03 DEVF-061` schema; every FR has an id and acceptance criteria)
 - `mvp_scope_freeze` → `mvp_scope.md` (must / should / could classification
   plus standing out-of-scope entries pointing at the deferred stages)
+- `ux_flow_inventory` → `screen_inventory.json`, `user_flows.md`,
+  `navigation_map.md` (one surface + flow per FR; surfaces are classified as
+  `ui` / `api` / `cli` / `logical` from description keywords — backend-only
+  PRDs fall back to `logical`)
 
 The PRD is a markdown file with `## Functional requirements`,
 `## Non-functional requirements`, and (optionally) `## Out of scope`
 sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
 
-Subsequent stages (UX flow, architecture, scaffold, vertical slice,
-backlog loop, release packaging — DEVF-063 to DEVF-071) are **not yet
-implemented**. The `--stack` argument is recorded in run metadata but does
-not drive any generator in this release.
+Subsequent stages (architecture, scaffold, vertical slice, backlog loop,
+release packaging — DEVF-064 to DEVF-071) are **not yet implemented**.
+The `--stack` argument is recorded in run metadata but does not drive any
+generator in this release.
 
 Empty PRDs and PRDs with zero functional requirements abort the workflow:
 a `failure.json` is written and the corresponding step in `state/steps.json`

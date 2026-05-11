@@ -34,8 +34,20 @@ from devforge.stages.requirements_schema import (
     build_requirements,
     save_requirements,
 )
+from devforge.stages.ux_flow import (
+    UxInventory,
+    build_ux_inventory,
+    save_navigation_map,
+    save_screen_inventory,
+    save_user_flows,
+)
 
-_STAGE_IDS = ["prd_intake", "requirements_inventory", "mvp_scope_freeze"]
+_STAGE_IDS = [
+    "prd_intake",
+    "requirements_inventory",
+    "mvp_scope_freeze",
+    "ux_flow_inventory",
+]
 
 
 def run_app_from_prd_workflow(
@@ -103,7 +115,17 @@ def run_app_from_prd_workflow(
         "mvp_scope_freeze", "completed", artifact_ref="mvp_scope.md"
     )
 
-    _write_final_report(run_ctx, intake, reqs, scope)
+    # Stage 4: ux_flow_inventory (DEVF-063)
+    state_store.save_step("ux_flow_inventory", "running")
+    inventory = build_ux_inventory(reqs, intake, scope)
+    save_screen_inventory(inventory, run_ctx.root / "screen_inventory.json")
+    save_user_flows(inventory, run_ctx.root / "user_flows.md")
+    save_navigation_map(inventory, run_ctx.root / "navigation_map.md")
+    state_store.save_step(
+        "ux_flow_inventory", "completed", artifact_ref="screen_inventory.json"
+    )
+
+    _write_final_report(run_ctx, intake, reqs, scope, inventory)
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +152,7 @@ def _write_final_report(
     intake: PrdIntake,
     reqs: Requirements,
     scope: MvpScope,
+    inventory: UxInventory | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append(f"# Final Report — run {run_ctx.run_id}")
@@ -155,6 +178,19 @@ def _write_final_report(
     lines.append(f"- Unknowns / ambiguities: **{len(reqs.unknowns)}**")
     lines.append("")
 
+    if inventory is not None:
+        lines.append("## UX inventory")
+        lines.append("")
+        lines.append(
+            f"- Screens: **{len(inventory.screens)}**, "
+            f"flows: **{len(inventory.flows)}**, "
+            f"navigation edges: **{len(inventory.navigation)}**"
+        )
+        kinds = sorted({s.kind for s in inventory.screens})
+        if kinds:
+            lines.append(f"- Surface kinds: {', '.join(kinds)}")
+        lines.append("")
+
     lines.append("## Artifacts")
     lines.append("")
     for name in (
@@ -164,6 +200,9 @@ def _write_final_report(
         "out_of_scope.md",
         "requirements.json",
         "mvp_scope.md",
+        "screen_inventory.json",
+        "user_flows.md",
+        "navigation_map.md",
     ):
         if (run_ctx.root / name).exists():
             lines.append(f"- `{name}`")

@@ -25,6 +25,7 @@ Tiny todo service.
 - Add a task (must)
   - POST /tasks returns 201
 - List tasks (should)
+  - GET /tasks returns JSON
 
 ## Non-functional requirements
 
@@ -57,6 +58,9 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
         "out_of_scope.md",
         "requirements.json",
         "mvp_scope.md",
+        "screen_inventory.json",
+        "user_flows.md",
+        "navigation_map.md",
         "final_report.md",
     ):
         assert (ctx.root / name).exists(), f"missing artifact: {name}"
@@ -69,6 +73,15 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
         assert fr["id"]
         assert fr["acceptance_criteria"]
 
+    # UX inventory should also classify the API-flavored sample PRD as `api`.
+    inventory = json.loads(
+        (ctx.root / "screen_inventory.json").read_text(encoding="utf-8")
+    )
+    assert len(inventory["screens"]) == 2
+    assert {s["kind"] for s in inventory["screens"]} == {"api"}
+    # Navigation always starts at the synthetic START node.
+    assert inventory["navigation"][0][0] == "START"
+
     state = StateStore(ctx.root)
     run = state.load_run()
     assert run["status"] == "completed"
@@ -77,6 +90,7 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
         "prd_intake": "completed",
         "requirements_inventory": "completed",
         "mvp_scope_freeze": "completed",
+        "ux_flow_inventory": "completed",
     }
 
 
@@ -98,6 +112,7 @@ def test_empty_prd_fails_at_intake(tmp_path: Path) -> None:
     assert steps["prd_intake"] == "failed"
     assert steps["requirements_inventory"] == "pending"
     assert steps["mvp_scope_freeze"] == "pending"
+    assert steps["ux_flow_inventory"] == "pending"
 
 
 def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
@@ -118,6 +133,7 @@ def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
     assert steps["prd_intake"] == "completed"
     assert steps["requirements_inventory"] == "failed"
     assert steps["mvp_scope_freeze"] == "pending"
+    assert steps["ux_flow_inventory"] == "pending"
     # PRD intake artifacts still written
     assert (ctx.root / "product_summary.md").exists()
     assert (ctx.root / "ambiguity_log.json").exists()
