@@ -1,0 +1,19 @@
+workflow: app_from_prd
+# Foundation only. UX flow, architecture, scaffold, vertical slice,
+# backlog implementation, QA, and release packaging are deferred to
+# future cycles (DEVF-063..071 — see docs/ROADMAP.md).
+stages:
+  - id: prd_intake
+    role: product_manager
+    mode: read_only
+    output: product_summary.md
+
+  - id: requirements_inventory
+    role: technical_planner
+    mode: read_only
+    output: requirements.json
+
+  - id: mvp_scope_freeze
+    role: product_manager
+    mode: read_only
+    output: mvp_scope.md

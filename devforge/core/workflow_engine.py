@@ -257,28 +257,38 @@ class WorkflowEngine:
             stages=[s.id for s in definition.stages],
         )
 
-        if workflow_id != "feature":
+        if workflow_id not in {"feature", "app_from_prd"}:
             self.state_store.update_run_status(
                 "failed",
                 error=f"workflow '{workflow_id}' has no engine handler registered",
             )
             raise WorkflowLoadError(
                 f"Workflow '{workflow_id}' is defined but no engine handler is "
-                f"registered yet. Supported workflows: feature"
+                f"registered yet. Supported workflows: feature, app_from_prd"
             )
 
         try:
             self.state_store.update_run_status("running")
-            from devforge.stages.feature_driver import run_feature_workflow
+            if workflow_id == "feature":
+                from devforge.stages.feature_driver import run_feature_workflow
 
-            run_feature_workflow(
-                self.cfg,
-                self.run_ctx,
-                implementer_override,
-                reviewer_override,
-                state_store=self.state_store,
-                definition=definition,
-            )
+                run_feature_workflow(
+                    self.cfg,
+                    self.run_ctx,
+                    implementer_override,
+                    reviewer_override,
+                    state_store=self.state_store,
+                    definition=definition,
+                )
+            else:  # app_from_prd
+                from devforge.stages.app_from_prd_driver import run_app_from_prd_workflow
+
+                run_app_from_prd_workflow(
+                    self.cfg,
+                    self.run_ctx,
+                    state_store=self.state_store,
+                    definition=definition,
+                )
             self.state_store.update_run_status("completed")
         except Exception as exc:
             self.state_store.update_run_status("failed", error=str(exc))

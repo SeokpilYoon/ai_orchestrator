@@ -128,9 +128,34 @@ Tournament mode (`tournament: true` + ≥2 healthy providers):
 - Each provider gets its own candidate; no inter-provider fallback
 - `comparison.md` is written automatically when there are ≥2 candidates
 
+## The app_from_prd workflow (foundation)
+
+`devforge create-app --from <prd>.md --stack <name>` runs three deterministic
+planning stages and writes planning artifacts to a new run directory:
+
+- `prd_intake` → `product_summary.md`, `ambiguity_log.json`,
+  `assumptions.md`, `out_of_scope.md`
+- `requirements_inventory` → `requirements.json` (matches the
+  `docs/plan/03 DEVF-061` schema; every FR has an id and acceptance criteria)
+- `mvp_scope_freeze` → `mvp_scope.md` (must / should / could classification
+  plus standing out-of-scope entries pointing at the deferred stages)
+
+The PRD is a markdown file with `## Functional requirements`,
+`## Non-functional requirements`, and (optionally) `## Out of scope`
+sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
+
+Subsequent stages (UX flow, architecture, scaffold, vertical slice,
+backlog loop, release packaging — DEVF-063 to DEVF-071) are **not yet
+implemented**. The `--stack` argument is recorded in run metadata but does
+not drive any generator in this release.
+
+Empty PRDs and PRDs with zero functional requirements abort the workflow:
+a `failure.json` is written and the corresponding step in `state/steps.json`
+is marked `failed`.
+
 ## Other workflows
 
-`bugfix`, `refactor`, `code_review_only`, `app_from_prd`, `research_optimize`
-are listed in `docs/plan/02 §6` but **not yet implemented**. `WorkflowEngine`
-raises `WorkflowLoadError("workflow … has no engine handler")` for those. See
+`bugfix`, `refactor`, `code_review_only`, `research_optimize` are listed in
+`docs/plan/02 §6` but **not yet implemented**. `WorkflowEngine` raises
+`WorkflowLoadError("workflow … has no engine handler")` for those. See
 [`ROADMAP.md`](ROADMAP.md).

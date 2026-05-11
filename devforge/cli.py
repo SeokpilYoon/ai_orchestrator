@@ -172,20 +172,50 @@ def run(
 
 
 # ---------------------------------------------------------------------------
-# create-app  (stub — DEVF-060+ scope, M6)
+# create-app  (DEVF-060/061/062 foundation; later stages DEVF-063+ pending)
 # ---------------------------------------------------------------------------
 
 @app.command("create-app")
 def create_app(
     from_: Path = typer.Option(..., "--from", exists=True, readable=True),
-    stack: str = typer.Option("python-fastapi-only", "--stack"),
+    stack: str = typer.Option(
+        "python-fastapi-only",
+        "--stack",
+        help="Target stack (informational; scaffold generator not yet implemented).",
+    ),
+    config: Path = typer.Option(Path("devforge.yaml"), "--config", "-c"),
 ) -> None:
-    """Generate an app from a PRD (M6 — currently a stub)."""
-    typer.echo(
-        "create-app workflow is part of M6 (app_from_prd). "
-        f"Inputs accepted: from={from_}, stack={stack}. Not yet implemented."
+    """Run the app_from_prd workflow. Produces planning artifacts only (DEVF-060/061/062)."""
+    from devforge.core.config_loader import ConfigError, load_config
+    from devforge.core.run_context import create_run_context
+    from devforge.core.workflow_engine import WorkflowEngine, WorkflowLoadError
+
+    try:
+        cfg = load_config(config)
+    except ConfigError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    ctx = create_run_context(
+        project_root=Path(cfg.project.root),
+        workflow="app_from_prd",
+        input_path=from_,
+        extra_metadata={"stack": stack},
     )
-    raise typer.Exit(code=0)
+    typer.echo(f"Created run: {ctx.run_id}")
+    typer.echo(f"Run directory: {ctx.root}")
+
+    try:
+        engine = WorkflowEngine(cfg, ctx)
+        engine.run("app_from_prd")
+    except WorkflowLoadError as exc:
+        typer.echo(f"Workflow error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    except Exception as exc:
+        typer.echo(f"Workflow driver error: {exc}", err=True)
+        raise typer.Exit(code=3) from exc
+
+    typer.echo(f"Planning artifacts written to {ctx.root}")
 
 
 # ---------------------------------------------------------------------------
