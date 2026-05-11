@@ -74,4 +74,5 @@ addopts = "-ra --strict-markers"
 markers = [
     "integration: integration tests (mock providers only)",
     "slow: slow tests",
+    "real_provider: smoke tests that require an installed Codex/Claude CLI (opt-in; see docs/REAL_PROVIDER_SMOKE.md)",
 ]

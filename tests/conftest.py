@@ -1,4 +1,4 @@
-"""Shared pytest fixtures."""
+"""Shared pytest fixtures and collection hooks."""
 from __future__ import annotations
 
 import subprocess
@@ -18,6 +18,24 @@ from devforge.core.config_loader import (
     ValidationCommands,
     ValidationConfig,
 )
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Auto-skip ``real_provider`` tests unless explicitly requested via ``-m real_provider``.
+
+    Setting ``addopts = -m 'not real_provider'`` would conflict with a user-supplied
+    ``-m real_provider`` (pytest ANDs them, yielding zero tests). A collection
+    hook avoids that pitfall.
+    """
+    markexpr = config.getoption("-m", default="") or ""
+    if "real_provider" in markexpr:
+        return  # user explicitly asked for them
+    skip = pytest.mark.skip(
+        reason="real_provider tests require `pytest -m real_provider`"
+    )
+    for item in items:
+        if "real_provider" in item.keywords:
+            item.add_marker(skip)
 
 
 @pytest.fixture
