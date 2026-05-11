@@ -1,0 +1,149 @@
+project:
+  name: my-app
+  root: "."
+  default_branch: main
+  worktree_root: "../my-app-worktrees"
+  profile: python_fastapi
+
+mode:
+  max_iterations_per_task: 4
+  max_candidates_per_task: 2
+  keep_best_candidate: true
+
+providers:
+  codex_sub_cli:
+    type: codex_cli
+    enabled: true
+    auth: chatgpt_subscription
+    command: codex
+    default_args:
+      - "exec"
+      - "--sandbox"
+      - "workspace-write"
+      - "--ask-for-approval"
+      - "never"
+      - "--ephemeral"
+    timeout_sec: 900
+
+  claude_sub_cli:
+    type: claude_cli
+    enabled: true
+    auth: claude_subscription
+    command: claude
+    default_args:
+      - "-p"
+      - "--output-format"
+      - "json"
+      - "--permission-mode"
+      - "acceptEdits"
+    timeout_sec: 900
+
+  codex_api_cli:
+    type: codex_cli
+    enabled: false
+    auth: openai_api_key
+    command: codex
+    env_required:
+      - OPENAI_API_KEY
+
+  claude_api_sdk:
+    type: claude_agent_sdk
+    enabled: false
+    auth: anthropic_api_key
+    env_required:
+      - ANTHROPIC_API_KEY
+
+  local_rule_based:
+    type: local_rule_based
+    enabled: true
+    auth: none
+
+roles:
+  product_manager:
+    provider_order:
+      - claude_sub_cli
+      - codex_sub_cli
+
+  implementer:
+    provider_order:
+      - codex_sub_cli
+      - claude_sub_cli
+    tournament: false
+
+  reviewer:
+    provider_order:
+      - claude_sub_cli
+      - codex_sub_cli
+    avoid_same_provider_as_implementer: true
+
+  judge:
+    provider_order:
+      - local_rule_based
+
+validation:
+  default_timeout_sec: 300
+  commands:
+    lint: "ruff check ."
+    typecheck: "mypy ."
+    test: "pytest -q"
+    import_smoke: "python -c 'import devforge'"
+
+file_policy:
+  allowed_paths:
+    - "src/**"
+    - "app/**"
+    - "tests/**"
+    - "docs/**"
+    - "pyproject.toml"
+    - "package.json"
+  blocked_paths:
+    - ".git/**"
+    - ".env"
+    - ".env.*"
+    - "secrets/**"
+  require_human_review_if_modified:
+    - "package-lock.json"
+    - "pnpm-lock.yaml"
+    - "yarn.lock"
+    - "poetry.lock"
+    - "uv.lock"
+    - "Dockerfile"
+    - "docker-compose.yml"
+    - "infra/**"
+    - "migrations/**"
+
+command_policy:
+  blocked_patterns:
+    - "rm -rf"
+    - "git push"
+    - "git reset --hard"
+    - "curl * | sh"
+    - "wget * | sh"
+    - "sudo"
+    - "docker system prune"
+  require_human_review:
+    - "npm install"
+    - "pip install"
+    - "poetry add"
+    - "uv add"
+    - "docker compose up"
+    - "terraform apply"
+    - "kubectl apply"
+
+scoring:
+  build_pass: 25
+  tests_pass: 25
+  lint_pass: 10
+  typecheck_pass: 10
+  acceptance_coverage: 20
+  reviewer_pass: 10
+
+stop_conditions:
+  accept_when:
+    build_pass: true
+    tests_pass: true
+    reviewer_verdict: pass
+    min_score: 85
+  discard_when:
+    blocked_file_modified: true
+    secret_detected: true

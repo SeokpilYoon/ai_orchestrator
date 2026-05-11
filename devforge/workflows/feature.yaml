@@ -1,0 +1,38 @@
+workflow: feature
+stages:
+  - id: normalize_task
+    role: technical_planner
+    mode: read_only
+    output: normalized_task.json
+
+  - id: inspect_repo
+    role: technical_planner
+    mode: read_only
+    output: repo_context.md
+
+  - id: plan
+    role: system_architect
+    mode: read_only
+    output: implementation_plan.json
+
+  - id: implement_candidates
+    role: implementer
+    mode: tournament
+    output: candidate_patches
+
+  - id: run_validation
+    type: local_evaluator
+    output: validation.json
+
+  - id: cross_review
+    role: reviewer
+    strategy: reviewer_not_same_as_implementer
+    output: review.json
+
+  - id: judge
+    type: deterministic_plus_llm
+    output: decision.json
+
+  - id: final_report
+    type: local_writer
+    output: final_report.md

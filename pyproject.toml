@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "devforge"
+version = "0.0.1"
+description = "AI Dev Orchestrator — local-first CLI that orchestrates Claude Code / Codex as bounded workers"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "AI Dev Orchestrator Contributors" }]
+keywords = ["claude-code", "codex", "agent", "orchestrator", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+]
+dependencies = [
+    "typer>=0.12",
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[project.scripts]
+devforge = "devforge.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["devforge*"]
+exclude = ["tests*", "_workspace*", ".orchestrator*"]
+
+[tool.setuptools.package-data]
+devforge = [
+    "workflows/*.yaml",
+    "prompts/roles/*.md",
+    "prompts/schemas/*.json",
+    "project_profiles/*.yaml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "SIM"]
+# B008: typer/click idiom (function call in argument default).
+# E501: long lines handled by formatter, not lint.
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: integration tests (mock providers only)",
+    "slow: slow tests",
+]

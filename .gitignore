@@ -1,0 +1,60 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+
+# venv
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+credentials.json
+
+# devforge runtime artifacts
+.orchestrator/
+
+# harness scratch — only track README
+_workspace/*
+!_workspace/README.md
+
+# dashboard (later)
+dashboard/web/node_modules/
+dashboard/web/.next/
+dashboard/web/dist/
+
+# database files (local SQLite for state store)
+*.db
+*.sqlite
+*.sqlite3

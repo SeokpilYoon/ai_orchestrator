@@ -1,0 +1,7 @@
+profile: python_fastapi
+validation:
+  commands:
+    lint: "ruff check ."
+    typecheck: "mypy ."
+    test: "pytest -q"
+    import_smoke: "python -c 'import app.main' || python -c 'import devforge'"
