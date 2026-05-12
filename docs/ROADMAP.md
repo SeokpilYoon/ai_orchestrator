@@ -18,7 +18,7 @@ These DEVF tasks pass tests and are wired into the CLI:
 | Routing & coordination | 050, 051, 052, 053, 054 | role router (incl. capability filtering), failure classifier, fallback executor, tournament mode, candidate comparison |
 | State store | 013, 080 | per-run JSON state under `.orchestrator/runs/<id>/state/` (DEVF-013) plus a project-level SQLite index at `.orchestrator/state.db` (DEVF-080). The SQLite index mirrors every JSON write — runs, steps, candidates, evaluations, provider_status — so cross-run queries answer without walking the filesystem. JSON remains authoritative per run; SQLite is best-effort and silently degrades when unavailable |
 | Report polish | 081 | `devforge report` markdown / json / state output; `devforge report --list` enumerates runs via the SQLite index with `--workflow`/`--limit`/`--format` filters |
-| Local dashboard backend | 082 | Read-only FastAPI app over the SQLite index (DEVF-080) + per-run JSON artifacts. Routes: `/api/runs`, `/api/runs/{id}`, `/api/runs/{id}/candidates[/{cid}[/diff]]`, `/api/runs/{id}/providers`, `/api/healthz`, plus a minimal HTML index at `/`. Served via `devforge dashboard --host --port`. FastAPI/uvicorn are optional extras (`pip install '.[dashboard]'`) so the core CLI stays slim |
+| Local dashboard | 082, 083 | Read-only FastAPI app over the SQLite index (DEVF-080) + per-run JSON artifacts. Routes under `/api/*` (runs, candidates, diffs, providers, healthz). DEVF-083 ships a vanilla HTML/JS frontend (no build step) at `/` with three views: runs list, run detail (steps + candidates + evaluations + provider status), and candidate detail (decision, score, review, validation, diff). Serve via `devforge dashboard --host --port`. FastAPI/uvicorn are optional extras (`pip install '.[dashboard]'`) so the core CLI stays slim |
 | Tests | 090, 091, 092, 093 | unit suite, mock integration suite, opt-in real provider smoke, security regression |
 | Packaging | 095 | wheel/sdist build via `pyproject.toml`, console-script entry point, `devforge --version` + `devforge version`, `CHANGELOG.md`, `docs/RELEASE_NOTES.md`. PyPI publish is **not implemented yet** (see below) |
 
@@ -32,7 +32,6 @@ These DEVF tasks pass tests and are wired into the CLI:
 
 | Area | DEVF | Status |
 |---|---|---|
-| Local dashboard frontend | 083 | no React/TUI yet — DEVF-082 backend ships, ready for a client to consume |
 | Generic workflow dispatcher | (architecture §5.2) | `WorkflowEngine` registers handlers for all six spec workflows: `feature`, `bugfix`, `refactor`, `code_review_only`, `research_optimize`, and `app_from_prd`. `research_optimize` runs a bounded inspect → hypothesise → (optionally implement) → verify cycle around a user-supplied metric command |
 | mypy strict pass | — | currently `mypy` runs in non-strict mode; type coverage is partial |
 | CI for real provider smoke | — | opt-in suite is local-only; no automated runner for `pytest -m real_provider` |

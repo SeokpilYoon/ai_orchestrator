@@ -67,6 +67,9 @@ devforge = [
     "prompts/roles/*.md",
     "prompts/schemas/*.json",
     "project_profiles/*.yaml",
+    "dashboard/static/*.html",
+    "dashboard/static/*.css",
+    "dashboard/static/*.js",
 ]
 
 [tool.ruff]

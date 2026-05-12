@@ -253,7 +253,28 @@ is marked `failed`.
 
 ## Other workflows
 
-`bugfix`, `refactor`, `code_review_only`, `research_optimize` are listed in
-`docs/plan/02 §6` but **not yet implemented**. `WorkflowEngine` raises
-`WorkflowLoadError("workflow … has no engine handler")` for those. See
-[`ROADMAP.md`](ROADMAP.md).
+All six spec workflows now ship: `feature`, `bugfix`, `refactor`,
+`code_review_only`, `research_optimize`, and `app_from_prd`. `bugfix`
+and `refactor` share the feature driver with a workflow-specific
+prompt prelude; `code_review_only` reviews an existing diff without
+invoking an implementer; `research_optimize` runs a bounded
+inspect → hypothesise → (optionally implement) → verify cycle around
+a user-supplied metric. See [`ROADMAP.md`](ROADMAP.md) and the
+``devforge/workflows/*.yaml`` files for the stage shapes.
+
+## Dashboard
+
+Install the optional extras and start the local dashboard:
+
+```bash
+pip install -e '.[dashboard]'
+devforge dashboard --host 127.0.0.1 --port 8765
+```
+
+Browse to `http://127.0.0.1:8765/`. The frontend is a vanilla
+HTML/JS app (no build step) that lists every run from the SQLite
+index, drills into per-run steps + candidates + evaluations +
+provider status, and shows each candidate's `diff.patch` /
+`decision.json` / `score.json` / `review.json` payloads. All data
+comes from the read-only `/api/*` endpoints documented at
+`/api/healthz` and below.

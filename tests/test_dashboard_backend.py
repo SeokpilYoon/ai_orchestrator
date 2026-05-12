@@ -83,12 +83,27 @@ def test_healthz_returns_ok(client) -> None:
     assert body["status"] == "ok"
 
 
-def test_root_html_lists_api_routes(client) -> None:
+def test_root_serves_static_index_html(client) -> None:
     resp = client.get("/")
     assert resp.status_code == 200
     body = resp.text
-    assert "/api/runs" in body
-    assert "/api/healthz" in body
+    # The static dashboard frontend (DEVF-083) loads app.js, which fetches
+    # /api/runs on first paint.
+    assert "<title>devforge dashboard</title>" in body
+    assert "/static/app.js" in body
+
+
+def test_static_app_js_is_served(client) -> None:
+    resp = client.get("/static/app.js")
+    assert resp.status_code == 200
+    # Sanity-check the script: it must hit /api/runs to render the index view.
+    assert "/api/runs" in resp.text
+
+
+def test_static_app_css_is_served(client) -> None:
+    resp = client.get("/static/app.css")
+    assert resp.status_code == 200
+    assert "table" in resp.text  # the dashboard renders run tables
 
 
 # ---------------------------------------------------------------------------

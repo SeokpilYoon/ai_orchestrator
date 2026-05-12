@@ -64,7 +64,8 @@ def create_app(project_root: Path):  # noqa: ANN201 — return type depends on F
     """
     try:
         from fastapi import FastAPI, HTTPException
-        from fastapi.responses import HTMLResponse, PlainTextResponse
+        from fastapi.responses import FileResponse, PlainTextResponse
+        from fastapi.staticfiles import StaticFiles
     except ImportError as exc:  # pragma: no cover - exercised only without extras
         raise DashboardImportError(
             "FastAPI is not installed. Install the dashboard extras: "
@@ -88,25 +89,29 @@ def create_app(project_root: Path):  # noqa: ANN201 — return type depends on F
         # never-run project shows an empty list rather than a 500.
         return SqliteIndex(db_path)
 
-    # ----- HTML index --------------------------------------------------
+    # ----- Static frontend (DEVF-083) ----------------------------------
 
-    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    def root_index() -> str:
-        return (
-            "<!doctype html><html><head>"
-            "<meta charset='utf-8'><title>devforge dashboard</title></head>"
-            "<body><h1>devforge dashboard</h1>"
-            "<p>Read-only JSON surface over <code>"
-            f"{db_path}</code>.</p>"
-            "<ul>"
-            "<li><a href='/api/runs'>/api/runs</a></li>"
-            "<li><code>/api/runs/{run_id}</code></li>"
-            "<li><code>/api/runs/{run_id}/candidates</code></li>"
-            "<li><code>/api/runs/{run_id}/candidates/{candidate_id}/diff</code></li>"
-            "<li><code>/api/runs/{run_id}/providers</code></li>"
-            "<li><a href='/api/healthz'>/api/healthz</a></li>"
-            "</ul></body></html>"
+    static_dir = Path(__file__).resolve().parent / "static"
+    if static_dir.is_dir():
+        app.mount(
+            "/static",
+            StaticFiles(directory=str(static_dir)),
+            name="static",
         )
+
+        @app.get("/", include_in_schema=False)
+        def root_index() -> FileResponse:
+            return FileResponse(str(static_dir / "index.html"))
+    else:  # pragma: no cover — only hit if the package was assembled wrong
+        from fastapi.responses import HTMLResponse  # noqa: PLC0415
+
+        @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+        def root_index() -> str:
+            return (
+                "<!doctype html><html><body>"
+                f"<p>Static dashboard files missing under {static_dir}. "
+                "Reinstall with the dashboard extras.</p></body></html>"
+            )
 
     # ----- Liveness ----------------------------------------------------
 
