@@ -184,15 +184,40 @@ planning stages and writes artifacts to a new run directory:
   acceptance criteria, or no implementer provider is healthy. Override
   the implementer / reviewer providers with `--implementer` and
   `--reviewer` on `devforge create-app`.
+- `backlog_generation` → `backlog.json`. Deterministic projection: one
+  `TASK-NNN` item per functional requirement, ordered by the requirement
+  index. Priority is mapped from the MVP scope (`must→P0`, `should→P1`,
+  `could→P2`). Complexity is a heuristic over the FR's API operations,
+  data entities, and acceptance-criteria count (`S` ≤ 1 of each, `L` ≥ 3
+  of any, `M` otherwise). Dependencies are derived from shared data
+  entities — every later item that touches an entity depends on the
+  highest-priority producer of that entity.
+- `backlog_implementation` → `backlog_progress.json` and accepted
+  candidate files committed into `<run_root>/scaffold/`. Iterates the
+  backlog in dependency order using the same scaffold-isolated candidate
+  loop as the slice implementer. Per-item rules:
+    - if every FR is already in the accepted vertical slice plan,
+      status is `already_in_slice` (no candidate is started);
+    - if any dependency did not produce an `accept` verdict, status is
+      `dependency_failed` and the item is skipped;
+    - otherwise the candidate loop runs, the worktree is built off the
+      scaffold's current `main` (so each task sees the previous task's
+      accepted code), and on `accept` the changed files are copied into
+      the scaffold + committed (`backlog: accept TASK-NNN`).
+  The artifact carries a per-task status, the run-level `accepted_count`
+  / `total_count`, and `acceptance_coverage` (fraction of acceptance
+  criteria covered by accepted items). The same compileall-only
+  validation limitation as the slice implementer applies — surfaced in
+  the artifact's `notes` field.
 
 The PRD is a markdown file with `## Functional requirements`,
 `## Non-functional requirements`, and (optionally) `## Out of scope`
 sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
 
-Subsequent stages (backlog loop, acceptance coverage, release
-packaging — DEVF-068 to DEVF-071) are **not yet implemented**. The
-`--stack` argument drives the scaffold generator profile but no other
-downstream generator yet.
+Subsequent stages (acceptance coverage calculator, release packaging —
+DEVF-070 to DEVF-071) are **not yet implemented**. The `--stack`
+argument drives the scaffold generator profile but no other downstream
+generator yet.
 
 Empty PRDs and PRDs with zero functional requirements abort the workflow:
 a `failure.json` is written and the corresponding step in `state/steps.json`

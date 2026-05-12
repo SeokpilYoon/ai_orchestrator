@@ -1,6 +1,6 @@
-"""Driver for the ``app_from_prd`` workflow (DEVF-060..067).
+"""Driver for the ``app_from_prd`` workflow (DEVF-060..069).
 
-Seven deterministic stages plus one provider-driven implementation stage:
+Eight deterministic stages plus two provider-driven implementation stages:
 
 1. ``prd_intake`` → ``product_summary.md`` + ``ambiguity_log.json``
    + ``assumptions.md`` + ``out_of_scope.md``
@@ -14,11 +14,15 @@ Seven deterministic stages plus one provider-driven implementation stage:
 7. ``vertical_slice_planner`` → ``vertical_slice_plan.json``
 8. ``vertical_slice_implementer`` → ``vertical_slice_result.json`` +
    accepted candidate files synced back into ``scaffold/``
+9. ``backlog_generation`` → ``backlog.json`` (one TASK-NNN per FR)
+10. ``backlog_implementation`` → ``backlog_progress.json`` (per-task
+    status + accepted candidate files committed into ``scaffold/``)
 
-Stages 1–7 are deterministic. Stage 8 runs the existing feature-pipeline
-candidate loop (implementer → validation → reviewer → judge → revisions)
-against a scaffold-scoped config; see
-:mod:`devforge.stages.vertical_slice_implementer`.
+Stages 1–7 and 9 are deterministic. Stages 8 and 10 run the existing
+feature-pipeline candidate loop (implementer → validation → reviewer →
+judge → revisions) against a scaffold-scoped config; see
+:mod:`devforge.stages.vertical_slice_implementer` and
+:mod:`devforge.stages.backlog_implementer`.
 
 A short ``final_report.md`` is also written so ``devforge report --latest``
 shows a useful summary.
@@ -38,6 +42,17 @@ from devforge.stages.architecture_generator import (
     save_architecture,
     save_data_model,
     save_tech_stack,
+)
+from devforge.stages.backlog_generator import (
+    Backlog,
+    BacklogGeneratorError,
+    generate_backlog,
+    save_backlog,
+)
+from devforge.stages.backlog_implementer import (
+    BacklogProgress,
+    run_backlog_implementer,
+    save_backlog_progress,
 )
 from devforge.stages.mvp_scope import MvpScope, freeze_mvp_scope, save_mvp_scope
 from devforge.stages.prd_intake import (
@@ -92,6 +107,8 @@ _STAGE_IDS = [
     "scaffold_generation",
     "vertical_slice_planner",
     "vertical_slice_implementer",
+    "backlog_generation",
+    "backlog_implementation",
 ]
 
 
@@ -299,6 +316,63 @@ def run_app_from_prd_workflow(
                 note=vsi_result.reason or None,
             )
 
+    # Stage 9: backlog_generation (DEVF-068)
+    state_store.save_step("backlog_generation", "running")
+    try:
+        backlog = generate_backlog(reqs, scope, inventory, arch)
+    except BacklogGeneratorError as exc:
+        state_store.save_step("backlog_generation", "failed", note=str(exc))
+        _write_failure(
+            run_ctx, "backlog generation failed", {"reason": str(exc)}
+        )
+        return
+    save_backlog(backlog, run_ctx.root / "backlog.json")
+    state_store.save_step(
+        "backlog_generation", "completed", artifact_ref="backlog.json"
+    )
+
+    # Stage 10: backlog_implementation (DEVF-069)
+    state_store.save_step("backlog_implementation", "running")
+    try:
+        backlog_progress = run_backlog_implementer(
+            cfg,
+            run_ctx,
+            backlog=backlog,
+            slice_plan=slice_plan,
+            slice_result=vsi_result,
+            arch=arch,
+            scaffold_manifest=manifest,
+            implementer_override=implementer_override,
+            reviewer_override=reviewer_override,
+        )
+    except Exception as exc:  # noqa: BLE001 — record + continue, never abort the run
+        backlog_progress = BacklogProgress(
+            decision="failed",
+            reason=f"backlog implementer raised: {exc}",
+            total_count=len(backlog.items),
+        )
+    save_backlog_progress(
+        backlog_progress, run_ctx.root / "backlog_progress.json"
+    )
+    if backlog_progress.decision == "skipped":
+        state_store.save_step(
+            "backlog_implementation",
+            "skipped",
+            note=backlog_progress.reason or None,
+        )
+    elif backlog_progress.decision == "failed":
+        state_store.save_step(
+            "backlog_implementation",
+            "failed",
+            note=backlog_progress.reason or None,
+        )
+    else:
+        state_store.save_step(
+            "backlog_implementation",
+            "completed",
+            artifact_ref="backlog_progress.json",
+        )
+
     _write_final_report(
         run_ctx,
         intake,
@@ -309,6 +383,8 @@ def run_app_from_prd_workflow(
         manifest,
         slice_plan,
         vsi_result,
+        backlog,
+        backlog_progress,
     )
 
 
@@ -341,6 +417,8 @@ def _write_final_report(
     scaffold: ScaffoldManifest | None = None,
     slice_plan: VerticalSlicePlan | None = None,
     slice_result: VerticalSliceImplementerResult | None = None,
+    backlog: Backlog | None = None,
+    backlog_progress: BacklogProgress | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append(f"# Final Report — run {run_ctx.run_id}")
@@ -471,6 +549,52 @@ def _write_final_report(
             )
         lines.append("")
 
+    if backlog_progress is not None:
+        lines.append("## Backlog implementation")
+        lines.append("")
+        lines.append(f"- Decision: **{backlog_progress.decision}**")
+        lines.append(
+            f"- Accepted: **{backlog_progress.accepted_count}** of "
+            f"**{backlog_progress.total_count}**"
+        )
+        lines.append(
+            f"- Acceptance coverage: **{backlog_progress.acceptance_coverage:.1%}**"
+        )
+        by_status: dict[str, int] = {}
+        for item in backlog_progress.items:
+            by_status[item.status] = by_status.get(item.status, 0) + 1
+        if by_status:
+            breakdown = ", ".join(
+                f"{status}={count}" for status, count in sorted(by_status.items())
+            )
+            lines.append(f"- Per-task status: {breakdown}")
+        if backlog_progress.reason:
+            lines.append(f"- Reason: {backlog_progress.reason}")
+        lines.append("")
+
+    if backlog is not None:
+        lines.append("## Backlog")
+        lines.append("")
+        priority_counts = {"P0": 0, "P1": 0, "P2": 0}
+        complexity_counts = {"S": 0, "M": 0, "L": 0}
+        for item in backlog.items:
+            priority_counts[item.priority] = priority_counts.get(item.priority, 0) + 1
+            complexity_counts[item.estimated_complexity] = (
+                complexity_counts.get(item.estimated_complexity, 0) + 1
+            )
+        lines.append(f"- Items: **{len(backlog.items)}**")
+        lines.append(
+            f"- Priority: P0={priority_counts['P0']}, "
+            f"P1={priority_counts['P1']}, P2={priority_counts['P2']}"
+        )
+        lines.append(
+            f"- Complexity: S={complexity_counts['S']}, "
+            f"M={complexity_counts['M']}, L={complexity_counts['L']}"
+        )
+        dep_items = sum(1 for it in backlog.items if it.dependencies)
+        lines.append(f"- Items with dependencies: **{dep_items}**")
+        lines.append("")
+
     lines.append("## Artifacts")
     lines.append("")
     for name in (
@@ -490,6 +614,8 @@ def _write_final_report(
         "scaffold_manifest.json",
         "vertical_slice_plan.json",
         "vertical_slice_result.json",
+        "backlog.json",
+        "backlog_progress.json",
     ):
         if (run_ctx.root / name).exists():
             lines.append(f"- `{name}`")

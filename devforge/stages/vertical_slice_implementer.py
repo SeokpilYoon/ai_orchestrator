@@ -530,6 +530,13 @@ def run_vertical_slice_implementer(
                         f"synced {len(synced)} of {len(chosen.changed_files)} "
                         f"changed file(s) — some entries may have been transient"
                     )
+                # Commit so DEVF-069 worktrees branch off the slice's tree.
+                if result.synced_to_scaffold:
+                    commit_scaffold_progress(
+                        scaffold_root,
+                        f"slice: accept {chosen.candidate_id} "
+                        f"({slice_plan.vertical_slice_name})",
+                    )
             except VerticalSliceImplementerError as exc:
                 result.notes.append(f"sync_worktree_to_scaffold failed: {exc}")
                 result.synced_to_scaffold = False
@@ -589,6 +596,50 @@ def _read_reviewer_id(run_ctx: RunContext, candidate_id: str) -> str | None:
         return None
     pid = payload.get("provider_id")
     return pid if isinstance(pid, str) else None
+
+
+def commit_scaffold_progress(scaffold_root: Path, message: str) -> bool:
+    """Stage + commit any uncommitted scaffold changes on the ``main`` branch.
+
+    Returns ``True`` when a new commit was created, ``False`` when there was
+    nothing to commit. Idempotent — safe to call after every accepted
+    candidate or backlog item.
+    """
+    scaffold_root = scaffold_root.resolve()
+    if not (scaffold_root / ".git").exists():
+        raise VerticalSliceImplementerError(
+            f"scaffold has no git repo: {scaffold_root}"
+        )
+    proc = subprocess.run(
+        ["git", "add", "-A"],
+        cwd=str(scaffold_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise VerticalSliceImplementerError(
+            f"git add failed: {proc.stderr.strip()}"
+        )
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=str(scaffold_root),
+        check=False,
+    )
+    if staged.returncode == 0:
+        return False  # nothing to commit
+    proc = subprocess.run(
+        ["git", "commit", "-m", message],
+        cwd=str(scaffold_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise VerticalSliceImplementerError(
+            f"git commit failed: {proc.stderr.strip() or proc.stdout.strip()}"
+        )
+    return True
 
 
 def _worktree_path_for(run_ctx: RunContext, candidate_id: str) -> Path | None:

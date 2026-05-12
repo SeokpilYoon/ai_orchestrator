@@ -1,4 +1,4 @@
-"""Integration coverage for the app_from_prd workflow (DEVF-060..067)."""
+"""Integration coverage for the app_from_prd workflow (DEVF-060..069)."""
 from __future__ import annotations
 
 import json
@@ -76,6 +76,8 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
         "api_contract.yaml",
         "tech_stack.md",
         "vertical_slice_plan.json",
+        "backlog.json",
+        "backlog_progress.json",
         "final_report.md",
     ):
         assert (ctx.root / name).exists(), f"missing artifact: {name}"
@@ -136,7 +138,9 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
     run = state.load_run()
     assert run["status"] == "completed"
     steps = {s["stage_id"]: s["status"] for s in state.load_steps()}
-    # No implementer role in this cfg, so the slice implementer skips cleanly.
+    # No implementer role in this cfg, so the slice implementer + backlog
+    # implementer both skip cleanly. The backlog generator is deterministic
+    # and always completes.
     assert steps == {
         "prd_intake": "completed",
         "requirements_inventory": "completed",
@@ -146,7 +150,32 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
         "scaffold_generation": "completed",
         "vertical_slice_planner": "completed",
         "vertical_slice_implementer": "skipped",
+        "backlog_generation": "completed",
+        "backlog_implementation": "skipped",
     }
+
+    # Backlog: one TASK item per functional requirement, priorities mapped
+    # from the MVP scope classification.
+    backlog = json.loads(
+        (ctx.root / "backlog.json").read_text(encoding="utf-8")
+    )
+
+    # Backlog progress artifact records the skip reason for every item.
+    progress = json.loads(
+        (ctx.root / "backlog_progress.json").read_text(encoding="utf-8")
+    )
+    assert progress["decision"] == "skipped"
+    assert progress["accepted_count"] == 0
+    assert progress["total_count"] == len(backlog["items"])
+    assert all(item["status"] == "skipped" for item in progress["items"])
+    assert len(backlog["items"]) == 2
+    by_fr = {item["requirement_ids"][0]: item for item in backlog["items"]}
+    assert by_fr["FR-001"]["priority"] == "P0"  # "must"
+    assert by_fr["FR-002"]["priority"] == "P1"  # "should"
+    for item in backlog["items"]:
+        assert item["id"].startswith("TASK-")
+        assert item["acceptance_criteria"]
+        assert item["estimated_complexity"] in {"S", "M", "L"}
 
     # Slice implementer recorded a skip artifact with a reason.
     vsi = json.loads(
@@ -179,6 +208,8 @@ def test_empty_prd_fails_at_intake(tmp_path: Path) -> None:
     assert steps["scaffold_generation"] == "pending"
     assert steps["vertical_slice_planner"] == "pending"
     assert steps["vertical_slice_implementer"] == "pending"
+    assert steps["backlog_generation"] == "pending"
+    assert steps["backlog_implementation"] == "pending"
 
 
 def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
@@ -204,6 +235,8 @@ def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
     assert steps["scaffold_generation"] == "pending"
     assert steps["vertical_slice_planner"] == "pending"
     assert steps["vertical_slice_implementer"] == "pending"
+    assert steps["backlog_generation"] == "pending"
+    assert steps["backlog_implementation"] == "pending"
     # PRD intake artifacts still written
     assert (ctx.root / "product_summary.md").exists()
     assert (ctx.root / "ambiguity_log.json").exists()
@@ -268,16 +301,28 @@ def _install_mock_registry(
 
     def impl_behavior(request):
         cwd = Path(request.cwd)
-        target = cwd / impl_target
+        candidate_id = (request.metadata or {}).get("candidate_id", "")
+        if isinstance(candidate_id, str) and candidate_id.startswith("TASK-"):
+            # Per-backlog-task file so each item leaves a distinct diff.
+            target_rel = f"app/services/{candidate_id.lower().replace('-', '_')}.py"
+            contents = (
+                f'"""Mock backlog impl for {candidate_id}."""\n'
+                f"def run() -> str:\n"
+                f'    return "{candidate_id}"\n'
+            )
+        else:
+            target_rel = impl_target
+            contents = impl_contents
+        target = cwd / target_rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(impl_contents, encoding="utf-8")
+        target.write_text(contents, encoding="utf-8")
         _commit_all_in(cwd)
         return AgentResult(
             provider_id="mock_impl",
             role="implementer",
             success=True,
-            stdout="slice implemented",
-            changed_files=[impl_target],
+            stdout=f"implemented {target_rel}",
+            changed_files=[target_rel],
             exit_code=0,
         )
 
@@ -350,10 +395,43 @@ def test_slice_implementer_accepts_and_syncs_back(
     for name in ("prompt.md", "agent_result.json", "review.json", "decision.json"):
         assert (cand_dir / name).exists(), f"missing candidate artifact: {name}"
 
-    # State store records the new stage as completed.
+    # State store records the new stages as completed.
     state = StateStore(ctx.root)
     steps = {s["stage_id"]: s["status"] for s in state.load_steps()}
     assert steps["vertical_slice_implementer"] == "completed"
+    assert steps["backlog_generation"] == "completed"
+    assert steps["backlog_implementation"] == "completed"
+
+    # Backlog generation runs after the slice implementer in the happy path.
+    backlog = json.loads((ctx.root / "backlog.json").read_text(encoding="utf-8"))
+    assert len(backlog["items"]) >= 1
+    assert backlog["items"][0]["priority"] in {"P0", "P1", "P2"}
+
+    # Backlog implementer: TASK-001 (FR-001) is already in the slice, so it
+    # should be skipped with `already_in_slice`. TASK-002 (FR-002, should) is
+    # not in the slice — it runs and gets accepted with a real file synced.
+    progress = json.loads(
+        (ctx.root / "backlog_progress.json").read_text(encoding="utf-8")
+    )
+    assert progress["decision"] == "completed"
+    by_task = {item["task_id"]: item for item in progress["items"]}
+    assert by_task["TASK-001"]["status"] == "already_in_slice"
+    assert by_task["TASK-002"]["status"] == "accept"
+    assert by_task["TASK-002"]["synced_to_scaffold"] is True
+    # The backlog-implemented file is visible in scaffold/.
+    backlog_target = ctx.root / "scaffold" / "app" / "services" / "task_002.py"
+    assert backlog_target.exists()
+
+    # Scaffold git history shows at least one slice commit + one backlog commit.
+    log = subprocess.run(
+        ["git", "log", "--oneline"],
+        cwd=ctx.root / "scaffold",
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "slice: accept" in log.stdout
+    assert "backlog: accept TASK-002" in log.stdout
 
     # Final report mentions the slice implementation.
     final = (ctx.root / "final_report.md").read_text(encoding="utf-8")

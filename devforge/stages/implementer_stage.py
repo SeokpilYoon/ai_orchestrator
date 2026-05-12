@@ -56,13 +56,22 @@ def run_implementer_stage(
     task_text: str,
     repo_context: str,
     acceptance_criteria: str,
+    candidate_ids: list[str] | None = None,
 ) -> list[CandidateResult]:
-    """Run each selected provider in its own worktree and collect diffs."""
+    """Run each selected provider in its own worktree and collect diffs.
+
+    ``candidate_ids``, when supplied, must match the length of ``provider_ids``
+    and provides per-provider candidate ids (e.g. ``TASK-001`` for backlog
+    loops). Defaults to ``candidate_id == provider_id``.
+    """
     prompt = build_implementer_prompt(task_text, repo_context, cfg, acceptance_criteria)
 
+    if candidate_ids is not None and len(candidate_ids) != len(provider_ids):
+        raise ValueError("candidate_ids must match the length of provider_ids")
+
     candidates: list[CandidateResult] = []
-    for pid in provider_ids:
-        candidate_id = pid
+    for i, pid in enumerate(provider_ids):
+        candidate_id = candidate_ids[i] if candidate_ids is not None else pid
         cand_dir = run_ctx.candidate_dir(candidate_id)
         (cand_dir / "prompt.md").write_text(prompt, encoding="utf-8")
 
@@ -106,7 +115,7 @@ def run_implementer_stage(
             allow_shell=True,
             allowed_paths=cfg.file_policy.allowed_paths,
             blocked_paths=cfg.file_policy.blocked_paths,
-            metadata={"workflow": run_ctx.workflow},
+            metadata={"workflow": run_ctx.workflow, "candidate_id": candidate_id},
         )
 
         result = provider.run(request)
