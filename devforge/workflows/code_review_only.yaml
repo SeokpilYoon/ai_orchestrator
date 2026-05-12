@@ -1,0 +1,24 @@
+workflow: code_review_only
+# Review an existing diff without running an implementer or creating a
+# worktree. The driver collects a diff (working tree / staged / ref
+# range / patch file), then runs reviewer + judge on it. See
+# ``devforge/stages/code_review_only_driver.py``.
+stages:
+  - id: collect_diff
+    role: technical_planner
+    mode: read_only
+    output: diff.patch
+
+  - id: review
+    role: reviewer
+    mode: read_only
+    output: review.json
+
+  - id: judge
+    role: judge
+    mode: read_only
+    output: decision.json
+
+  - id: final_report
+    type: local_writer
+    output: final_report.md

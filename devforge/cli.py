@@ -126,16 +126,36 @@ def run(
         "--workflow",
         "-w",
         help=(
-            "Workflow id: feature | bugfix | refactor | app_from_prd. "
-            "`bugfix` and `refactor` share the feature stage shape but "
-            "frame the implementer prompt for that intent."
+            "Workflow id: feature | bugfix | refactor | code_review_only | "
+            "app_from_prd. `bugfix` and `refactor` share the feature stage "
+            "shape but frame the implementer prompt for that intent. "
+            "`code_review_only` runs reviewer+judge over a pre-existing diff."
         ),
     ),
-    task: Path = typer.Option(..., "--task", "-t", exists=True, readable=True),
+    task: Path | None = typer.Option(
+        None,
+        "--task",
+        "-t",
+        exists=True,
+        readable=True,
+        help=(
+            "Task markdown. Required for feature/bugfix/refactor. Optional "
+            "for code_review_only — when omitted the reviewer falls back to "
+            "general quality + safety review."
+        ),
+    ),
     implementer: str | None = typer.Option(None, "--implementer"),
     reviewer: str | None = typer.Option(None, "--reviewer"),
     tournament: str | None = typer.Option(
         None, "--tournament", help="Comma-separated provider ids for tournament mode."
+    ),
+    diff_from: str | None = typer.Option(
+        None,
+        "--diff-from",
+        help=(
+            "Source of the diff for code_review_only: "
+            "working (default) | staged | ref:<a..b> | file:<path>."
+        ),
     ),
     config: Path = typer.Option(Path("devforge.yaml"), "--config", "-c"),
 ) -> None:
@@ -149,6 +169,13 @@ def run(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 
+    # `code_review_only` is the only workflow where --task is optional.
+    if workflow != "code_review_only" and task is None:
+        typer.echo(
+            "--task is required for workflow '" + workflow + "'", err=True
+        )
+        raise typer.Exit(code=2)
+
     ctx = create_run_context(
         project_root=Path(cfg.project.root),
         workflow=workflow,
@@ -157,6 +184,7 @@ def run(
             "implementer_override": implementer,
             "reviewer_override": reviewer,
             "tournament": tournament.split(",") if tournament else None,
+            "diff_spec": diff_from,
         },
     )
     typer.echo(f"Created run: {ctx.run_id}")

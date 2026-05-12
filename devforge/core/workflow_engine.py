@@ -260,7 +260,7 @@ class WorkflowEngine:
         # ``bugfix`` and ``refactor`` share the feature driver — only the
         # prompt framing differs. See devforge/stages/_workflow_variants.py.
         feature_family = {"feature", "bugfix", "refactor"}
-        supported_workflows = feature_family | {"app_from_prd"}
+        supported_workflows = feature_family | {"app_from_prd", "code_review_only"}
         if workflow_id not in supported_workflows:
             self.state_store.update_run_status(
                 "failed",
@@ -285,6 +285,19 @@ class WorkflowEngine:
                     state_store=self.state_store,
                     definition=definition,
                     workflow_variant=workflow_id,
+                )
+            elif workflow_id == "code_review_only":
+                from devforge.stages.code_review_only_driver import (
+                    run_code_review_only_workflow,
+                )
+
+                run_code_review_only_workflow(
+                    self.cfg,
+                    self.run_ctx,
+                    implementer_override=implementer_override,
+                    reviewer_override=reviewer_override,
+                    state_store=self.state_store,
+                    definition=definition,
                 )
             else:  # app_from_prd
                 from devforge.stages.app_from_prd_driver import run_app_from_prd_workflow
