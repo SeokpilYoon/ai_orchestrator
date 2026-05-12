@@ -121,7 +121,16 @@ def providers_status(
 
 @app.command()
 def run(
-    workflow: str = typer.Option("feature", "--workflow", "-w"),
+    workflow: str = typer.Option(
+        "feature",
+        "--workflow",
+        "-w",
+        help=(
+            "Workflow id: feature | bugfix | refactor | app_from_prd. "
+            "`bugfix` and `refactor` share the feature stage shape but "
+            "frame the implementer prompt for that intent."
+        ),
+    ),
     task: Path = typer.Option(..., "--task", "-t", exists=True, readable=True),
     implementer: str | None = typer.Option(None, "--implementer"),
     reviewer: str | None = typer.Option(None, "--reviewer"),

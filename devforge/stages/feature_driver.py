@@ -17,6 +17,7 @@ from devforge.core.state_store import StateStore
 from devforge.evaluators.judge import Decision
 from devforge.git.worktree_manager import WorktreeManager
 from devforge.providers.registry import ProviderRegistry
+from devforge.stages import _workflow_variants
 from devforge.stages import candidate_loop as _candidate_loop
 from devforge.stages.candidate_loop import TERMINAL_VERDICTS
 from devforge.stages.final_report import CandidateSummary, save_decision, write_final_report
@@ -65,12 +66,19 @@ def run_feature_workflow(
     *,
     state_store: StateStore | None = None,
     definition: Any = None,    # devforge.core.workflow_engine.WorkflowDefinition
+    workflow_variant: str = "feature",
 ) -> None:
-    """Run the feature workflow end-to-end.
+    """Run the feature workflow (or a feature-shaped variant) end-to-end.
 
     ``state_store`` is optional for backwards compatibility. When omitted the
     driver constructs a :class:`StateStore` automatically so every run still
     records its progress under ``<run_root>/state/``.
+
+    ``workflow_variant`` switches the prompt framing handed to the
+    implementer. ``"feature"`` (default) is unchanged. ``"bugfix"`` and
+    ``"refactor"`` prepend a short guidance block (see
+    :mod:`devforge.stages._workflow_variants`) so the same driver code
+    drives all three workflows with workflow-specific intent.
     """
     if state_store is None:
         state_store = StateStore(run_ctx.root)
@@ -90,7 +98,9 @@ def run_feature_workflow(
     )
 
     # 0) artifact stages (DEVF-040/041/042)
-    task_text = _read_task(run_ctx.input_path)
+    task_text = _workflow_variants.apply_guidance(
+        workflow_variant, _read_task(run_ctx.input_path)
+    )
     state_store.save_step("normalize_task", "running")
     state_store.save_step("inspect_repo", "running")
     state_store.save_step("plan", "running")

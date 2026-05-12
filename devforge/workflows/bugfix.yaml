@@ -1,0 +1,35 @@
+workflow: bugfix
+# Bugfix is a variant of the feature workflow. Stage shape is identical;
+# the engine routes both to ``run_feature_workflow`` with
+# ``workflow_variant='bugfix'`` so the implementer prompt is framed as
+# a minimum-scope bug fix (failing test first, no scope expansion, no
+# unrelated refactors). See devforge/stages/_workflow_variants.py.
+stages:
+  - id: normalize_task
+    role: technical_planner
+    mode: read_only
+    output: normalized_task.json
+
+  - id: inspect_repo
+    role: technical_planner
+    mode: read_only
+    output: repo_context.md
+
+  - id: plan
+    role: system_architect
+    mode: read_only
+    output: implementation_plan.json
+
+  - id: implement_candidates
+    role: implementer
+    mode: tournament
+    composite: true
+    output: candidate_summaries
+
+  - id: comparison_report
+    type: local_writer
+    output: comparison.md
+
+  - id: final_report
+    type: local_writer
+    output: final_report.md

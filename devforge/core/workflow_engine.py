@@ -257,19 +257,24 @@ class WorkflowEngine:
             stages=[s.id for s in definition.stages],
         )
 
-        if workflow_id not in {"feature", "app_from_prd"}:
+        # ``bugfix`` and ``refactor`` share the feature driver — only the
+        # prompt framing differs. See devforge/stages/_workflow_variants.py.
+        feature_family = {"feature", "bugfix", "refactor"}
+        supported_workflows = feature_family | {"app_from_prd"}
+        if workflow_id not in supported_workflows:
             self.state_store.update_run_status(
                 "failed",
                 error=f"workflow '{workflow_id}' has no engine handler registered",
             )
             raise WorkflowLoadError(
                 f"Workflow '{workflow_id}' is defined but no engine handler is "
-                f"registered yet. Supported workflows: feature, app_from_prd"
+                f"registered yet. Supported workflows: "
+                f"{', '.join(sorted(supported_workflows))}"
             )
 
         try:
             self.state_store.update_run_status("running")
-            if workflow_id == "feature":
+            if workflow_id in feature_family:
                 from devforge.stages.feature_driver import run_feature_workflow
 
                 run_feature_workflow(
@@ -279,6 +284,7 @@ class WorkflowEngine:
                     reviewer_override,
                     state_store=self.state_store,
                     definition=definition,
+                    workflow_variant=workflow_id,
                 )
             else:  # app_from_prd
                 from devforge.stages.app_from_prd_driver import run_app_from_prd_workflow
