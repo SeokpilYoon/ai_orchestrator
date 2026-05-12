@@ -255,6 +255,21 @@ def create_app(
 def report(
     run_id: str | None = typer.Option(None, "--run"),
     latest: bool = typer.Option(False, "--latest"),
+    list_: bool = typer.Option(
+        False,
+        "--list",
+        help="List recent runs from the SQLite index instead of printing a single run.",
+    ),
+    workflow: str | None = typer.Option(
+        None,
+        "--workflow",
+        help="Filter --list by workflow id (e.g. feature, app_from_prd).",
+    ),
+    limit: int = typer.Option(
+        20,
+        "--limit",
+        help="Maximum runs shown in --list mode.",
+    ),
     fmt: str = typer.Option(
         "text",
         "--format",
@@ -271,6 +286,15 @@ def report(
     except ConfigError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
+
+    if list_:
+        _emit_list(
+            project_root=Path(cfg.project.root),
+            workflow=workflow,
+            limit=limit,
+            fmt=fmt,
+        )
+        return
 
     runs_dir = Path(cfg.project.root) / ".orchestrator" / "runs"
     target = _resolve_run_dir(runs_dir, run_id=run_id, latest=latest)
@@ -292,6 +316,64 @@ def report(
             f"Unknown format '{fmt}'. Use text | markdown | json | state.", err=True
         )
         raise typer.Exit(code=2)
+
+
+def _emit_list(
+    *, project_root: Path, workflow: str | None, limit: int, fmt: str
+) -> None:
+    """Cross-run summary backed by the DEVF-080 SQLite index."""
+    import json as _json
+
+    from devforge.core.sqlite_index import SqliteIndex
+
+    db_path = project_root / ".orchestrator" / "state.db"
+    if not db_path.exists():
+        typer.echo("No SQLite index yet — run a workflow first.")
+        return
+    idx = SqliteIndex(db_path)
+    runs = idx.list_runs(workflow=workflow, limit=max(1, limit))
+
+    if fmt == "json":
+        typer.echo(_json.dumps(runs, indent=2, ensure_ascii=False))
+        return
+
+    if not runs:
+        if workflow:
+            typer.echo(f"No runs recorded for workflow '{workflow}'.")
+        else:
+            typer.echo("No runs recorded yet.")
+        return
+
+    lines: list[str] = []
+    if fmt in ("text", "markdown"):
+        lines.append(
+            "| Run | Workflow | Status | Started | Completed | Chosen |"
+        )
+        lines.append("|---|---|---|---|---|---|")
+        for r in runs:
+            lines.append(
+                f"| `{r.get('run_id', '?')}` | "
+                f"{r.get('workflow', '?')} | "
+                f"**{r.get('status', '?')}** | "
+                f"{r.get('started_at') or '—'} | "
+                f"{r.get('completed_at') or '—'} | "
+                f"{r.get('chosen_candidate') or '—'} |"
+            )
+    elif fmt == "state":
+        # Compact one-line-per-run for shell consumption.
+        for r in runs:
+            lines.append(
+                f"{r.get('run_id', '?')}\t{r.get('workflow', '?')}\t"
+                f"{r.get('status', '?')}\t"
+                f"chosen={r.get('chosen_candidate') or '-'}"
+            )
+    else:
+        typer.echo(
+            f"Unknown format '{fmt}'. Use text | markdown | json | state.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    typer.echo("\n".join(lines))
 
 
 def _resolve_run_dir(
