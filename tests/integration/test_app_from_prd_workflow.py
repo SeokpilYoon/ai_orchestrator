@@ -1,4 +1,4 @@
-"""Integration coverage for the app_from_prd workflow (DEVF-060..069)."""
+"""Integration coverage for the app_from_prd workflow (DEVF-060..070)."""
 from __future__ import annotations
 
 import json
@@ -78,6 +78,7 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
         "vertical_slice_plan.json",
         "backlog.json",
         "backlog_progress.json",
+        "acceptance_coverage.json",
         "final_report.md",
     ):
         assert (ctx.root / name).exists(), f"missing artifact: {name}"
@@ -139,8 +140,8 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
     assert run["status"] == "completed"
     steps = {s["stage_id"]: s["status"] for s in state.load_steps()}
     # No implementer role in this cfg, so the slice implementer + backlog
-    # implementer both skip cleanly. The backlog generator is deterministic
-    # and always completes.
+    # implementer both skip cleanly. The backlog generator and acceptance
+    # coverage calculator are deterministic and always complete.
     assert steps == {
         "prd_intake": "completed",
         "requirements_inventory": "completed",
@@ -152,7 +153,17 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
         "vertical_slice_implementer": "skipped",
         "backlog_generation": "completed",
         "backlog_implementation": "skipped",
+        "acceptance_coverage_calculation": "completed",
     }
+
+    # Acceptance coverage: nothing was accepted, so coverage is 0/total.
+    cov = json.loads(
+        (ctx.root / "acceptance_coverage.json").read_text(encoding="utf-8")
+    )
+    assert cov["overall"]["total"] >= 1
+    assert cov["overall"]["passed"] == 0
+    assert cov["overall"]["coverage"] == 0.0
+    assert all(fr["covered_by"] == "none" for fr in cov["by_requirement"])
 
     # Backlog: one TASK item per functional requirement, priorities mapped
     # from the MVP scope classification.
@@ -210,6 +221,7 @@ def test_empty_prd_fails_at_intake(tmp_path: Path) -> None:
     assert steps["vertical_slice_implementer"] == "pending"
     assert steps["backlog_generation"] == "pending"
     assert steps["backlog_implementation"] == "pending"
+    assert steps["acceptance_coverage_calculation"] == "pending"
 
 
 def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
@@ -237,6 +249,7 @@ def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
     assert steps["vertical_slice_implementer"] == "pending"
     assert steps["backlog_generation"] == "pending"
     assert steps["backlog_implementation"] == "pending"
+    assert steps["acceptance_coverage_calculation"] == "pending"
     # PRD intake artifacts still written
     assert (ctx.root / "product_summary.md").exists()
     assert (ctx.root / "ambiguity_log.json").exists()
@@ -432,6 +445,17 @@ def test_slice_implementer_accepts_and_syncs_back(
     )
     assert "slice: accept" in log.stdout
     assert "backlog: accept TASK-002" in log.stdout
+
+    # Acceptance coverage: FR-001 via slice, FR-002 via backlog, total 100%.
+    cov = json.loads(
+        (ctx.root / "acceptance_coverage.json").read_text(encoding="utf-8")
+    )
+    by_fr = {fr["requirement_id"]: fr for fr in cov["by_requirement"]}
+    assert by_fr["FR-001"]["covered_by"] == "slice"
+    assert by_fr["FR-002"]["covered_by"] == "backlog"
+    assert by_fr["FR-002"]["source_task_ids"] == ["TASK-002"]
+    assert cov["overall"]["coverage"] == 1.0
+    assert steps["acceptance_coverage_calculation"] == "completed"
 
     # Final report mentions the slice implementation.
     final = (ctx.root / "final_report.md").read_text(encoding="utf-8")

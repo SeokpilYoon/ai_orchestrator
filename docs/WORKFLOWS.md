@@ -209,13 +209,22 @@ planning stages and writes artifacts to a new run directory:
   criteria covered by accepted items). The same compileall-only
   validation limitation as the slice implementer applies — surfaced in
   the artifact's `notes` field.
+- `acceptance_coverage_calculation` → `acceptance_coverage.json`.
+  Deterministic. Joins the original requirements with the slice plan +
+  result and the backlog + progress to compute, per FR:
+  `total` (acceptance criteria count), `passed`, `coverage`,
+  `covered_by` (`slice` | `backlog` | `none`), and the `source_task_ids`
+  that delivered it. Adds a per-priority roll-up (`must`/`should`/
+  `could`) and an overall fraction. In this release per-FR coverage is
+  binary — a fractional value will appear when the judge starts grading
+  individual acceptance criteria.
 
 The PRD is a markdown file with `## Functional requirements`,
 `## Non-functional requirements`, and (optionally) `## Out of scope`
 sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
 
-Subsequent stages (acceptance coverage calculator, release packaging —
-DEVF-070 to DEVF-071) are **not yet implemented**. The `--stack`
+The release packaging stage (DEVF-071 — README, deployment notes, QA
+report, final report bundle) is **not yet implemented**. The `--stack`
 argument drives the scaffold generator profile but no other downstream
 generator yet.
 

@@ -42,9 +42,8 @@ def test_standing_out_of_scope_entries_added() -> None:
     reqs = Requirements(functional=[_fr(1, "must")])
     scope = freeze_mvp_scope(reqs, intake)
     assert "Authentication" in scope.out_of_scope
-    assert any("Acceptance coverage" in item for item in scope.out_of_scope)
-    assert any("DEVF-070" in item for item in scope.out_of_scope)
     assert any("Release packaging" in item for item in scope.out_of_scope)
+    assert any("DEVF-071" in item for item in scope.out_of_scope)
 
 
 def test_target_users_missing_adds_assumption() -> None:

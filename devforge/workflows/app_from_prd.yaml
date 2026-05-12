@@ -1,8 +1,8 @@
 workflow: app_from_prd
 # Foundation + UX inventory + architecture planning + scaffold + vertical
 # slice planner + vertical slice implementer + backlog generation +
-# backlog implementation loop. Acceptance-coverage calculator and release
-# packaging are deferred to future cycles (DEVF-070..071 — see
+# backlog implementation loop + acceptance coverage calculator. Release
+# packaging is deferred to a future cycle (DEVF-071 — see
 # docs/ROADMAP.md).
 stages:
   - id: prd_intake
@@ -54,3 +54,8 @@ stages:
     role: implementer
     mode: single
     output: backlog_progress.json
+
+  - id: acceptance_coverage_calculation
+    role: technical_planner
+    mode: read_only
+    output: acceptance_coverage.json

@@ -18,12 +18,10 @@ from devforge.stages.requirements_schema import (
 )
 
 _STANDING_OUT_OF_SCOPE = [
-    "Acceptance coverage calculator (DEVF-070) — not in this MVP cycle",
     "Release packaging (DEVF-071) — not in this MVP cycle",
 ]
 
 _NEXT_CYCLE = [
-    "DEVF-070: acceptance coverage and validation",
     "DEVF-071: app packaging / release handoff",
 ]
 

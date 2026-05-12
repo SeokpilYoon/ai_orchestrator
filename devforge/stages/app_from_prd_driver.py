@@ -1,6 +1,6 @@
-"""Driver for the ``app_from_prd`` workflow (DEVF-060..069).
+"""Driver for the ``app_from_prd`` workflow (DEVF-060..070).
 
-Eight deterministic stages plus two provider-driven implementation stages:
+Nine deterministic stages plus two provider-driven implementation stages:
 
 1. ``prd_intake`` → ``product_summary.md`` + ``ambiguity_log.json``
    + ``assumptions.md`` + ``out_of_scope.md``
@@ -17,10 +17,13 @@ Eight deterministic stages plus two provider-driven implementation stages:
 9. ``backlog_generation`` → ``backlog.json`` (one TASK-NNN per FR)
 10. ``backlog_implementation`` → ``backlog_progress.json`` (per-task
     status + accepted candidate files committed into ``scaffold/``)
+11. ``acceptance_coverage_calculation`` → ``acceptance_coverage.json``
+    (per-FR coverage with slice/backlog/none attribution + per-priority
+    roll-up)
 
-Stages 1–7 and 9 are deterministic. Stages 8 and 10 run the existing
-feature-pipeline candidate loop (implementer → validation → reviewer →
-judge → revisions) against a scaffold-scoped config; see
+Stages 1–7, 9 and 11 are deterministic. Stages 8 and 10 run the
+existing feature-pipeline candidate loop (implementer → validation →
+reviewer → judge → revisions) against a scaffold-scoped config; see
 :mod:`devforge.stages.vertical_slice_implementer` and
 :mod:`devforge.stages.backlog_implementer`.
 
@@ -35,6 +38,11 @@ from typing import Any
 from devforge.core.config_loader import DevforgeConfig
 from devforge.core.run_context import RunContext
 from devforge.core.state_store import StateStore
+from devforge.stages.acceptance_coverage import (
+    AcceptanceCoverage,
+    calculate_acceptance_coverage,
+    save_acceptance_coverage,
+)
 from devforge.stages.architecture_generator import (
     Architecture,
     build_architecture,
@@ -109,6 +117,7 @@ _STAGE_IDS = [
     "vertical_slice_implementer",
     "backlog_generation",
     "backlog_implementation",
+    "acceptance_coverage_calculation",
 ]
 
 
@@ -373,6 +382,25 @@ def run_app_from_prd_workflow(
             artifact_ref="backlog_progress.json",
         )
 
+    # Stage 11: acceptance_coverage_calculation (DEVF-070)
+    state_store.save_step("acceptance_coverage_calculation", "running")
+    coverage = calculate_acceptance_coverage(
+        reqs,
+        scope,
+        slice_plan=slice_plan,
+        slice_result=vsi_result,
+        backlog=backlog,
+        backlog_progress=backlog_progress,
+    )
+    save_acceptance_coverage(
+        coverage, run_ctx.root / "acceptance_coverage.json"
+    )
+    state_store.save_step(
+        "acceptance_coverage_calculation",
+        "completed",
+        artifact_ref="acceptance_coverage.json",
+    )
+
     _write_final_report(
         run_ctx,
         intake,
@@ -385,6 +413,7 @@ def run_app_from_prd_workflow(
         vsi_result,
         backlog,
         backlog_progress,
+        coverage,
     )
 
 
@@ -419,6 +448,7 @@ def _write_final_report(
     slice_result: VerticalSliceImplementerResult | None = None,
     backlog: Backlog | None = None,
     backlog_progress: BacklogProgress | None = None,
+    acceptance: AcceptanceCoverage | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append(f"# Final Report — run {run_ctx.run_id}")
@@ -572,6 +602,32 @@ def _write_final_report(
             lines.append(f"- Reason: {backlog_progress.reason}")
         lines.append("")
 
+    if acceptance is not None:
+        lines.append("## Acceptance coverage")
+        lines.append("")
+        lines.append(
+            f"- Overall: **{acceptance.overall_passed}/{acceptance.overall_total}** "
+            f"acceptance criteria covered "
+            f"(**{acceptance.overall_coverage:.1%}**)"
+        )
+        if acceptance.by_priority:
+            roll = ", ".join(
+                f"{pr.priority}={pr.passed}/{pr.total} "
+                f"({pr.coverage:.0%})"
+                for pr in acceptance.by_priority
+            )
+            lines.append(f"- By priority: {roll}")
+        sources = {"slice": 0, "backlog": 0, "none": 0}
+        for fr in acceptance.by_requirement:
+            sources[fr.covered_by] = sources.get(fr.covered_by, 0) + 1
+        lines.append(
+            f"- Source attribution: "
+            f"slice={sources.get('slice', 0)}, "
+            f"backlog={sources.get('backlog', 0)}, "
+            f"uncovered={sources.get('none', 0)}"
+        )
+        lines.append("")
+
     if backlog is not None:
         lines.append("## Backlog")
         lines.append("")
@@ -616,6 +672,7 @@ def _write_final_report(
         "vertical_slice_result.json",
         "backlog.json",
         "backlog_progress.json",
+        "acceptance_coverage.json",
     ):
         if (run_ctx.root / name).exists():
             lines.append(f"- `{name}`")
