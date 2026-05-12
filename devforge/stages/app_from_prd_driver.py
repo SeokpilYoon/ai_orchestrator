@@ -1,11 +1,16 @@
-"""Driver for the ``app_from_prd`` workflow (DEVF-060/061/062).
+"""Driver for the ``app_from_prd`` workflow (DEVF-060..065).
 
-Three deterministic stages — no provider / no worktree / no judge:
+Six deterministic stages — no provider / no worktree / no judge:
 
 1. ``prd_intake`` → ``product_summary.md`` + ``ambiguity_log.json``
    + ``assumptions.md`` + ``out_of_scope.md``
 2. ``requirements_inventory`` → ``requirements.json``
 3. ``mvp_scope_freeze`` → ``mvp_scope.md``
+4. ``ux_flow_inventory`` → ``screen_inventory.json`` + ``user_flows.md``
+   + ``navigation_map.md``
+5. ``architecture_design`` → ``architecture.md`` + ``data_model.md``
+   + ``api_contract.yaml`` + ``tech_stack.md``
+6. ``scaffold_generation`` → ``scaffold/`` + ``scaffold_manifest.json``
 
 A short ``final_report.md`` is also written so ``devforge report --latest``
 shows a useful summary.
@@ -42,6 +47,12 @@ from devforge.stages.requirements_schema import (
     build_requirements,
     save_requirements,
 )
+from devforge.stages.scaffold_generator import (
+    ScaffoldError,
+    ScaffoldManifest,
+    generate_scaffold,
+    save_scaffold_manifest,
+)
 from devforge.stages.ux_flow import (
     UxInventory,
     build_ux_inventory,
@@ -56,6 +67,7 @@ _STAGE_IDS = [
     "mvp_scope_freeze",
     "ux_flow_inventory",
     "architecture_design",
+    "scaffold_generation",
 ]
 
 
@@ -149,7 +161,44 @@ def run_app_from_prd_workflow(
         "architecture_design", "completed", artifact_ref="architecture.md"
     )
 
-    _write_final_report(run_ctx, intake, reqs, scope, inventory, arch)
+    # Stage 6: scaffold_generation (DEVF-065)
+    state_store.save_step("scaffold_generation", "running")
+    scaffold_root = run_ctx.root / "scaffold"
+    try:
+        manifest = generate_scaffold(
+            arch,
+            reqs,
+            scope,
+            inventory,
+            scaffold_root,
+            run_root=run_ctx.root,
+            project_name=project_name,
+        )
+    except ScaffoldError as exc:
+        state_store.save_step("scaffold_generation", "failed", note=str(exc))
+        _write_failure(
+            run_ctx, "scaffold generation failed", {"reason": str(exc)}
+        )
+        return
+    save_scaffold_manifest(manifest, run_ctx.root / "scaffold_manifest.json")
+    if not manifest.supported:
+        state_store.save_step(
+            "scaffold_generation",
+            "skipped",
+            note=f"stack '{arch.stack}' has no scaffold profile",
+        )
+    elif not manifest.import_smoke_passed:
+        state_store.save_step(
+            "scaffold_generation",
+            "failed",
+            note="py_compile smoke failed; see scaffold_manifest.json notes",
+        )
+    else:
+        state_store.save_step(
+            "scaffold_generation", "completed", artifact_ref="scaffold/"
+        )
+
+    _write_final_report(run_ctx, intake, reqs, scope, inventory, arch, manifest)
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +227,7 @@ def _write_final_report(
     scope: MvpScope,
     inventory: UxInventory | None = None,
     arch: Architecture | None = None,
+    scaffold: ScaffoldManifest | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append(f"# Final Report — run {run_ctx.run_id}")
@@ -232,6 +282,28 @@ def _write_final_report(
         )
         lines.append("")
 
+    if scaffold is not None:
+        lines.append("## Scaffold")
+        lines.append("")
+        if scaffold.supported and scaffold.import_smoke_passed:
+            lines.append(
+                f"- Stack: `{scaffold.stack}` — generated **{len(scaffold.files)}** "
+                f"file(s) under `{scaffold.scaffold_root}/`"
+            )
+            lines.append(f"- Test command: `{scaffold.test_command}`")
+            lines.append("- Import smoke (py_compile): **passed**")
+        elif scaffold.supported and not scaffold.import_smoke_passed:
+            lines.append(
+                f"- Stack: `{scaffold.stack}` — generated files but py_compile "
+                f"smoke **failed**; see `scaffold_manifest.json` notes"
+            )
+        else:
+            lines.append(
+                f"- Stack: `{scaffold.stack}` — **skipped** (no scaffold "
+                f"profile yet)"
+            )
+        lines.append("")
+
     lines.append("## Artifacts")
     lines.append("")
     for name in (
@@ -248,9 +320,12 @@ def _write_final_report(
         "data_model.md",
         "api_contract.yaml",
         "tech_stack.md",
+        "scaffold_manifest.json",
     ):
         if (run_ctx.root / name).exists():
             lines.append(f"- `{name}`")
+    if scaffold is not None and scaffold.supported:
+        lines.append(f"- `{scaffold.scaffold_root}/` (scaffold directory)")
     lines.append("")
 
     lines.append("## Next cycle")

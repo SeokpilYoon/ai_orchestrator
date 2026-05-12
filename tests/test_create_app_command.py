@@ -53,7 +53,7 @@ def test_create_app_happy_path(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "Planning artifacts written" in result.output
+    assert "Workflow artifacts written" in result.output
 
     runs = list((repo / ".orchestrator" / "runs").iterdir())
     assert len(runs) == 1
@@ -62,6 +62,7 @@ def test_create_app_happy_path(tmp_path: Path) -> None:
         "product_summary.md",
         "requirements.json",
         "mvp_scope.md",
+        "scaffold_manifest.json",
     ):
         assert (run_root / name).exists()
 

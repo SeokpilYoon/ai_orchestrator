@@ -1,4 +1,4 @@
-"""Integration coverage for the app_from_prd workflow (DEVF-060/061/062)."""
+"""Integration coverage for the app_from_prd workflow (DEVF-060..065)."""
 from __future__ import annotations
 
 import json
@@ -94,6 +94,24 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
     assert contract["openapi"].startswith("3.0")
     assert "/tasks" in contract["paths"]
 
+    # Scaffold manifest + actual generated files.
+    manifest = json.loads(
+        (ctx.root / "scaffold_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["supported"] is True
+    assert manifest["import_smoke_passed"] is True
+    assert manifest["scaffold_root"] == "scaffold"
+    for rel in (
+        "scaffold/pyproject.toml",
+        "scaffold/app/main.py",
+        "scaffold/app/store.py",
+        "scaffold/app/models/task.py",
+        "scaffold/app/routes/tasks.py",
+        "scaffold/app/services/tasks.py",
+        "scaffold/tests/test_tasks.py",
+    ):
+        assert (ctx.root / rel).exists(), f"missing scaffold file: {rel}"
+
     state = StateStore(ctx.root)
     run = state.load_run()
     assert run["status"] == "completed"
@@ -104,6 +122,7 @@ def test_full_run_writes_six_artifacts(tmp_path: Path) -> None:
         "mvp_scope_freeze": "completed",
         "ux_flow_inventory": "completed",
         "architecture_design": "completed",
+        "scaffold_generation": "completed",
     }
 
 
@@ -127,6 +146,7 @@ def test_empty_prd_fails_at_intake(tmp_path: Path) -> None:
     assert steps["mvp_scope_freeze"] == "pending"
     assert steps["ux_flow_inventory"] == "pending"
     assert steps["architecture_design"] == "pending"
+    assert steps["scaffold_generation"] == "pending"
 
 
 def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
@@ -149,6 +169,7 @@ def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
     assert steps["mvp_scope_freeze"] == "pending"
     assert steps["ux_flow_inventory"] == "pending"
     assert steps["architecture_design"] == "pending"
+    assert steps["scaffold_generation"] == "pending"
     # PRD intake artifacts still written
     assert (ctx.root / "product_summary.md").exists()
     assert (ctx.root / "ambiguity_log.json").exists()

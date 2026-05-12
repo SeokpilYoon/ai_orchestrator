@@ -42,8 +42,8 @@ def test_standing_out_of_scope_entries_added() -> None:
     reqs = Requirements(functional=[_fr(1, "must")])
     scope = freeze_mvp_scope(reqs, intake)
     assert "Authentication" in scope.out_of_scope
-    assert any("Scaffold generation" in item for item in scope.out_of_scope)
-    assert any("DEVF-065" in item for item in scope.out_of_scope)
+    assert any("Vertical slice planning and implementation" in item for item in scope.out_of_scope)
+    assert any("DEVF-066/067" in item for item in scope.out_of_scope)
     assert any("Release packaging" in item for item in scope.out_of_scope)
 
 

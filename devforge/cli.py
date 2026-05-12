@@ -172,7 +172,7 @@ def run(
 
 
 # ---------------------------------------------------------------------------
-# create-app  (DEVF-060/061/062 foundation; later stages DEVF-063+ pending)
+# create-app  (DEVF-060..065 foundation; later stages DEVF-066+ pending)
 # ---------------------------------------------------------------------------
 
 @app.command("create-app")
@@ -181,11 +181,14 @@ def create_app(
     stack: str = typer.Option(
         "python-fastapi-only",
         "--stack",
-        help="Target stack (informational; scaffold generator not yet implemented).",
+        help=(
+            "Target stack. `python-fastapi-only` emits a runnable scaffold; "
+            "other stacks are recorded as skipped."
+        ),
     ),
     config: Path = typer.Option(Path("devforge.yaml"), "--config", "-c"),
 ) -> None:
-    """Run the app_from_prd workflow. Produces planning artifacts only (DEVF-060/061/062)."""
+    """Run the app_from_prd workflow and write planning plus scaffold artifacts."""
     from devforge.core.config_loader import ConfigError, load_config
     from devforge.core.run_context import create_run_context
     from devforge.core.workflow_engine import WorkflowEngine, WorkflowLoadError
@@ -215,7 +218,7 @@ def create_app(
         typer.echo(f"Workflow driver error: {exc}", err=True)
         raise typer.Exit(code=3) from exc
 
-    typer.echo(f"Planning artifacts written to {ctx.root}")
+    typer.echo(f"Workflow artifacts written to {ctx.root}")
 
 
 # ---------------------------------------------------------------------------

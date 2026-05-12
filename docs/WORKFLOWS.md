@@ -130,8 +130,8 @@ Tournament mode (`tournament: true` + ≥2 healthy providers):
 
 ## The app_from_prd workflow (foundation)
 
-`devforge create-app --from <prd>.md --stack <name>` runs five deterministic
-planning stages and writes planning artifacts to a new run directory:
+`devforge create-app --from <prd>.md --stack <name>` runs six deterministic
+planning stages and writes artifacts to a new run directory:
 
 - `prd_intake` → `product_summary.md`, `ambiguity_log.json`,
   `assumptions.md`, `out_of_scope.md`
@@ -147,15 +147,24 @@ planning stages and writes planning artifacts to a new run directory:
   `api_contract.yaml` (OpenAPI 3.0), `tech_stack.md`. Only the
   `python-fastapi-only` stack has a concrete profile in this release; other
   stack values are recorded but marked **planned** in the artifacts.
+- `scaffold_generation` → `scaffold/` directory + `scaffold_manifest.json`.
+  For `python-fastapi-only` this writes a runnable FastAPI skeleton
+  (pyproject.toml, `app/main.py`, in-memory `app/store.py`, per-entity
+  `app/models/<entity>.py`, `app/routes/<resource>.py`,
+  `app/services/<resource>.py`, `tests/test_<resource>.py`, README).
+  Every generated `.py` file passes `python -m py_compile`. Other stacks
+  produce a manifest with `supported=false` and **no files are written**.
+  The output is always isolated under `<run_root>/scaffold/` — the host
+  repository is never touched.
 
 The PRD is a markdown file with `## Functional requirements`,
 `## Non-functional requirements`, and (optionally) `## Out of scope`
 sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
 
-Subsequent stages (scaffold, vertical slice, backlog loop, release
-packaging — DEVF-065 to DEVF-071) are **not yet implemented**. The
-`--stack` argument is recorded in run metadata but does not drive any
-generator in this release.
+Subsequent stages (vertical slice, backlog loop, release packaging —
+DEVF-066 to DEVF-071) are **not yet implemented**. The `--stack`
+argument drives the scaffold generator profile but no other downstream
+generator yet.
 
 Empty PRDs and PRDs with zero functional requirements abort the workflow:
 a `failure.json` is written and the corresponding step in `state/steps.json`
