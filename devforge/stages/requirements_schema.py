@@ -110,13 +110,16 @@ def build_requirements(intake: PrdIntake) -> Requirements:
         )
 
     non_functional: list[NonFunctionalRequirement] = []
-    for i, raw in enumerate(intake.raw_non_functional, start=1):
+    for i, nfr_raw in enumerate(intake.raw_non_functional, start=1):
         nfr_id = f"NFR-{i:03d}"
-        description = raw
-        title = description[:_TITLE_MAX_LEN]
+        nfr_description = nfr_raw
+        nfr_title = nfr_description[:_TITLE_MAX_LEN]
         non_functional.append(
             NonFunctionalRequirement(
-                id=nfr_id, title=title, description=description, priority="must"
+                id=nfr_id,
+                title=nfr_title,
+                description=nfr_description,
+                priority="must",
             )
         )
 

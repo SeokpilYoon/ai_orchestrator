@@ -131,11 +131,13 @@ def build_architecture(
     project_name: str = "app",
 ) -> Architecture:
     """Build a planning architecture record from the upstream PRD artifacts."""
-    profile = _STACK_PROFILES.get(stack)
-    supported = profile is not None
+    maybe_profile = _STACK_PROFILES.get(stack)
+    supported = maybe_profile is not None
     notes: list[str] = []
+    profile: dict[str, object] = (
+        maybe_profile if maybe_profile is not None else _infer_unsupported_profile(stack)
+    )
     if not supported:
-        profile = _infer_unsupported_profile(stack)
         notes.append(
             f"Stack profile '{stack}' is planned — treat the generated outline "
             f"as a placeholder. Only 'python-fastapi-only' has a concrete profile."
@@ -144,8 +146,14 @@ def build_architecture(
     runtime = str(profile["runtime"])
     framework = str(profile["framework"])
     test_command = str(profile["test_command"])
-    scaffold_outline = list(profile["scaffold_outline"])  # type: ignore[arg-type]
-    layers = [tuple(item) for item in profile["layers"]]  # type: ignore[arg-type]
+    raw_outline = profile["scaffold_outline"]
+    scaffold_outline = list(raw_outline) if isinstance(raw_outline, list) else []
+    raw_layers = profile["layers"]
+    layers = (
+        [tuple(item) for item in raw_layers]
+        if isinstance(raw_layers, list)
+        else []
+    )
 
     entities = _extract_entities(reqs, inventory)
     operations = _extract_operations(reqs, inventory, entities)

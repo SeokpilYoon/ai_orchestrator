@@ -694,10 +694,12 @@ def _write_final_report(
         lines.append("")
         priority_counts = {"P0": 0, "P1": 0, "P2": 0}
         complexity_counts = {"S": 0, "M": 0, "L": 0}
-        for item in backlog.items:
-            priority_counts[item.priority] = priority_counts.get(item.priority, 0) + 1
-            complexity_counts[item.estimated_complexity] = (
-                complexity_counts.get(item.estimated_complexity, 0) + 1
+        for backlog_item in backlog.items:
+            priority_counts[backlog_item.priority] = (
+                priority_counts.get(backlog_item.priority, 0) + 1
+            )
+            complexity_counts[backlog_item.estimated_complexity] = (
+                complexity_counts.get(backlog_item.estimated_complexity, 0) + 1
             )
         lines.append(f"- Items: **{len(backlog.items)}**")
         lines.append(
@@ -743,8 +745,8 @@ def _write_final_report(
 
     lines.append("## Next cycle")
     lines.append("")
-    for item in scope.next_cycle:
-        lines.append(f"- {item}")
+    for next_cycle_entry in scope.next_cycle:
+        lines.append(f"- {next_cycle_entry}")
     lines.append("")
 
     (run_ctx.root / "final_report.md").write_text(

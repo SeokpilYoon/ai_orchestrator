@@ -18,6 +18,14 @@ from devforge.providers.base import (
 )
 
 
+def _to_str(value: bytes | str | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
 def _collect_changed_files(cwd: Path) -> list[str]:
     """Collect changed files via ``git diff --name-only HEAD`` (best-effort)."""
     if not (cwd / ".git").exists() and not _inside_worktree(cwd):
@@ -83,13 +91,15 @@ def run_cli(
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
+        # ``text=True`` makes stdout/stderr ``str``, but TimeoutExpired exposes
+        # them as ``bytes | str | None`` — normalise so downstream sees ``str``.
         return AgentResult(
             provider_id=provider_id,
             role=role,
             success=False,
             exit_code=124,
-            stdout=exc.stdout or "",
-            stderr=exc.stderr or "",
+            stdout=_to_str(exc.stdout),
+            stderr=_to_str(exc.stderr),
             error=f"timeout after {request.timeout_sec}s",
             failure_class=FAILURE_TIMEOUT,
         )

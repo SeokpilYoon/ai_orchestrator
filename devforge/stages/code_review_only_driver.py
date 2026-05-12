@@ -110,15 +110,15 @@ def collect_diff_text(
             project_root, ["git", "ls-files", "--others", "--exclude-standard"]
         )
         parts = [tracked]
-        for path in untracked_listing.splitlines():
-            path = path.strip()
-            if not path:
+        for raw_line in untracked_listing.splitlines():
+            rel = raw_line.strip()
+            if not rel:
                 continue
             # devforge's own runtime state (run dirs, sqlite index) is
             # untracked but is not source code under review.
-            if path.startswith(".orchestrator/") or path == ".orchestrator":
+            if rel.startswith(".orchestrator/") or rel == ".orchestrator":
                 continue
-            full = (project_root / path).resolve()
+            full = (project_root / rel).resolve()
             if not full.exists() or not full.is_file():
                 continue
             # `git diff --no-index` exits 1 when the files differ — that's

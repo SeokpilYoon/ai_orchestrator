@@ -87,6 +87,41 @@ python_version = "3.11"
 strict = false
 ignore_missing_imports = true
 warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+
+# Incremental strict-mode tier. Modules listed below are held to a
+# tighter standard: untyped defs / Any returns / implicit-Optional are
+# all flagged. The rest of the codebase stays on the default profile so
+# the typing roll-out can happen module-by-module without forcing a
+# big-bang rewrite. See docs/TYPING.md.
+[[tool.mypy.overrides]]
+module = [
+    "devforge.core.config_loader",
+    "devforge.core.run_context",
+    "devforge.core.sqlite_index",
+    "devforge.core.state_store",
+    "devforge.evaluators.command_policy_checker",
+    "devforge.evaluators.file_policy_checker",
+    "devforge.evaluators.judge",
+    "devforge.evaluators.score_calculator",
+    "devforge.evaluators.secret_scanner",
+    "devforge.evaluators.test_mutation_checker",
+    "devforge.evaluators.validation_runner",
+    "devforge.providers.base",
+    "devforge.providers.local_rule_based",
+    "devforge.providers.mock",
+    "devforge.providers.openai_api",
+    "devforge.providers.claude_agent_sdk",
+    "devforge.stages.backlog_generator",
+    "devforge.stages.acceptance_coverage",
+    "devforge.stages.release_packaging",
+    "devforge.stages._workflow_variants",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+warn_return_any = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

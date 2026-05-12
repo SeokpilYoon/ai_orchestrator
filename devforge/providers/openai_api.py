@@ -190,9 +190,11 @@ def _extract_usage(response: Any) -> dict[str, Any] | None:
     # Pydantic-style model: prefer model_dump, fall back to dict shape.
     if hasattr(usage, "model_dump"):
         try:
-            return usage.model_dump()
+            dumped = usage.model_dump()
         except Exception:  # noqa: BLE001 — best-effort serialization
-            pass
+            dumped = None
+        if isinstance(dumped, dict):
+            return dict(dumped)
     if isinstance(usage, dict):
         return dict(usage)
     return None

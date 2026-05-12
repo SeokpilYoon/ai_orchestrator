@@ -85,13 +85,17 @@ def _run_one(name: str, command: str, cwd: Path, timeout_sec: int) -> CommandRes
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
+        # ``text=True`` makes stdout/stderr ``str``, but TimeoutExpired exposes
+        # them as ``bytes | str | None`` — normalise so we always concat strings.
+        stdout_str = _to_str(exc.stdout)
+        stderr_str = _to_str(exc.stderr)
         return CommandResult(
             name=name,
             command=command,
             passed=False,
             exit_code=124,
             duration_sec=round(time.monotonic() - started, 2),
-            output_tail=(exc.stdout or "")[-500:] + (exc.stderr or "")[-500:],
+            output_tail=stdout_str[-500:] + stderr_str[-500:],
             timed_out=True,
         )
     except (FileNotFoundError, OSError) as exc:
@@ -118,6 +122,14 @@ def _run_one(name: str, command: str, cwd: Path, timeout_sec: int) -> CommandRes
 def save_validation_report(report: ValidationReport, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+
+
+def _to_str(value: bytes | str | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 # Silence unused-import warnings on shlex (kept for future quoting needs).

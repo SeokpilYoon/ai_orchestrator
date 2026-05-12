@@ -105,8 +105,12 @@ def create_app(project_root: Path):  # noqa: ANN201 — return type depends on F
     else:  # pragma: no cover — only hit if the package was assembled wrong
         from fastapi.responses import HTMLResponse  # noqa: PLC0415
 
-        @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-        def root_index() -> str:
+        @app.get(
+            "/",
+            response_class=HTMLResponse,
+            include_in_schema=False,
+        )
+        def root_index_fallback() -> str:
             return (
                 "<!doctype html><html><body>"
                 f"<p>Static dashboard files missing under {static_dir}. "

@@ -52,7 +52,7 @@ def _load_anthropic_module() -> Any:
     same ``Anthropic`` / ``messages.create`` shape we need.
     """
     try:
-        import claude_agent_sdk as mod  # type: ignore[import-not-found]  # noqa: PLC0415
+        import claude_agent_sdk as mod  # noqa: PLC0415
 
         return mod
     except ImportError:
@@ -208,9 +208,11 @@ def _extract_usage(response: Any) -> dict[str, Any] | None:
         return None
     if hasattr(usage, "model_dump"):
         try:
-            return usage.model_dump()
+            dumped = usage.model_dump()
         except Exception:  # noqa: BLE001 — best-effort serialization
-            pass
+            dumped = None
+        if isinstance(dumped, dict):
+            return dict(dumped)
     if isinstance(usage, dict):
         return dict(usage)
     # Fallback: pluck the conventional keys.

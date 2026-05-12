@@ -15,6 +15,7 @@ is unavailable — the JSON layer remains authoritative.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -56,9 +57,10 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        loaded: Any = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive
         raise StateStoreError(f"corrupt state file {path}: {exc}") from exc
+    return loaded if isinstance(loaded, dict) else None
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -96,7 +98,7 @@ class StateStore:
     def run_id(self) -> str:
         return self.run_root.name
 
-    def _safe_mirror(self, fn) -> None:
+    def _safe_mirror(self, fn: Callable[[SqliteIndex], None]) -> None:
         """Run a SQLite mirror update; swallow errors so JSON writes never fail."""
         if self._sqlite is None:
             return
@@ -170,13 +172,15 @@ class StateStore:
         )
         _write_json(self.candidates_path, {"candidates": []})
 
+        started_at_str = str(run_doc["started_at"])
+
         def _mirror(idx: SqliteIndex) -> None:
             idx.upsert_run(
                 run_id=self.run_id,
                 workflow=workflow,
                 status="pending",
                 input_ref=input_ref,
-                started_at=run_doc["started_at"],
+                started_at=started_at_str,
                 root_path=str(self.run_root.resolve()),
             )
             for sid in stages:

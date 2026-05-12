@@ -38,6 +38,7 @@ No LLM dependency. Identical determinism guarantees to the rest of the
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -202,16 +203,16 @@ def _flows_in_navigation_order(inventory: UxInventory) -> list[UserFlow]:
         for sid in (src, dst):
             if sid == "START":
                 continue
-            flow = flow_by_screen.get(sid)
-            if flow is None or flow.id in seen_flow_ids:
+            nav_flow = flow_by_screen.get(sid)
+            if nav_flow is None or nav_flow.id in seen_flow_ids:
                 continue
-            seen_flow_ids.add(flow.id)
-            ordered.append(flow)
+            seen_flow_ids.add(nav_flow.id)
+            ordered.append(nav_flow)
 
-    for flow in inventory.flows:
-        if flow.id not in seen_flow_ids:
-            seen_flow_ids.add(flow.id)
-            ordered.append(flow)
+    for tail_flow in inventory.flows:
+        if tail_flow.id not in seen_flow_ids:
+            seen_flow_ids.add(tail_flow.id)
+            ordered.append(tail_flow)
     return ordered
 
 
@@ -290,11 +291,11 @@ def _data_entities_for(
     return out
 
 
-def _ordered_union(items: object) -> list[str]:
+def _ordered_union(items: Iterable[object]) -> list[str]:
     """Deduplicate an iterable of strings while preserving first-seen order."""
     out: list[str] = []
     seen: set[str] = set()
-    for raw in items:  # type: ignore[assignment]
+    for raw in items:
         if not isinstance(raw, str):
             continue
         if raw and raw not in seen:

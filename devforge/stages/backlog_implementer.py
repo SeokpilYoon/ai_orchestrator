@@ -146,11 +146,11 @@ def run_backlog_implementer(
         return progress
 
     # Reuse the slice implementer's manifest gates so behavior matches.
+    # ``skip_reason`` is annotated as taking a VerticalSlicePlan; this stub
+    # exposes the only field the function reads (``acceptance_criteria``).
     scaffold_skip = _scaffold_skip_reason(
         scaffold_manifest,
-        # Synthesise a non-empty plan so skip_reason doesn't trip on
-        # acceptance_criteria — backlog items carry their own AC.
-        _BACKLOG_GATE_STUB,
+        _BACKLOG_GATE_STUB,  # type: ignore[arg-type]
     )
     if scaffold_skip is not None:
         progress.decision = "skipped"

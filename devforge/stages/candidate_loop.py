@@ -145,11 +145,14 @@ def execute_with_fallback(
         ar = outcome.candidate.agent_result
         return (ar.failure_class, ar.error)
 
+    # The TypeVar in run_with_fallback widens to ``CandidateOutcome | None``
+    # because the function caches the last result; the local callables only
+    # ever see a real CandidateOutcome, so the cast is sound.
     outcome, history = run_with_fallback(
         provider_ids,
         runner=runner,
-        is_success=is_success,
-        classify=classify,
+        is_success=is_success,  # type: ignore[arg-type]
+        classify=classify,  # type: ignore[arg-type]
     )
     if outcome is None or not is_success(outcome):
         # Build a failure summary if we have *some* candidate to point at.
@@ -158,6 +161,8 @@ def execute_with_fallback(
         return None, history
 
     # Promote the successful candidate through the revision loop.
+    # ``is_success`` above already guarantees ``outcome.candidate is not None``.
+    assert outcome.candidate is not None
     summary = run_revision_loop(
         cand=outcome.candidate,
         cfg=cfg,
