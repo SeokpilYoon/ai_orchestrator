@@ -218,15 +218,34 @@ planning stages and writes artifacts to a new run directory:
   `could`) and an overall fraction. In this release per-FR coverage is
   binary — a fractional value will appear when the judge starts grading
   individual acceptance criteria.
+- `release_packaging` → `<run_root>/release/{README, deployment,
+  release_notes, qa_report, final_report}.md`. Deterministic handoff
+  bundle:
+    - `README.md` — install + run + test instructions for the scaffold,
+      with the run's delivery status surfaced at the top
+    - `deployment.md` — runtime / persistence notes, env-var policy,
+      pre-deploy checklist (in-memory store, auth, rate-limiting,
+      pytest run), known limitations carried over from upstream stages
+    - `release_notes.md` — slice + backlog outcomes, per-priority
+      coverage, out-of-scope items (PRD-declared + standing)
+    - `qa_report.md` — per-priority + per-FR coverage tables, an
+      outstanding-items section, and follow-up recommendations
+    - `final_report.md` — one-page exec summary with pointers to the
+      other release docs (distinct from `<run_root>/final_report.md`,
+      which stays as the machine-readable run summary)
+  The stage records `deployable: true` only when the scaffold smoke
+  passed and every `must`-priority requirement is fully covered. It
+  skips cleanly when the scaffold stack is unsupported (no profile, so
+  nothing to package).
 
 The PRD is a markdown file with `## Functional requirements`,
 `## Non-functional requirements`, and (optionally) `## Out of scope`
 sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
 
-The release packaging stage (DEVF-071 — README, deployment notes, QA
-report, final report bundle) is **not yet implemented**. The `--stack`
-argument drives the scaffold generator profile but no other downstream
-generator yet.
+The `app_from_prd` pipeline now covers DEVF-060..071 end-to-end —
+every stage above ships. The `--stack` argument drives the scaffold
+generator profile; only `python-fastapi-only` emits actual code, but
+the planning + packaging artifacts are produced for every stack.
 
 Empty PRDs and PRDs with zero functional requirements abort the workflow:
 a `failure.json` is written and the corresponding step in `state/steps.json`

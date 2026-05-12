@@ -1,6 +1,6 @@
-"""Driver for the ``app_from_prd`` workflow (DEVF-060..070).
+"""Driver for the ``app_from_prd`` workflow (DEVF-060..071).
 
-Nine deterministic stages plus two provider-driven implementation stages:
+Ten deterministic stages plus two provider-driven implementation stages:
 
 1. ``prd_intake`` → ``product_summary.md`` + ``ambiguity_log.json``
    + ``assumptions.md`` + ``out_of_scope.md``
@@ -20,8 +20,10 @@ Nine deterministic stages plus two provider-driven implementation stages:
 11. ``acceptance_coverage_calculation`` → ``acceptance_coverage.json``
     (per-FR coverage with slice/backlog/none attribution + per-priority
     roll-up)
+12. ``release_packaging`` → ``release/`` (README, deployment, release
+    notes, QA report, and a human-readable final report)
 
-Stages 1–7, 9 and 11 are deterministic. Stages 8 and 10 run the
+Stages 1–7, 9, 11 and 12 are deterministic. Stages 8 and 10 run the
 existing feature-pipeline candidate loop (implementer → validation →
 reviewer → judge → revisions) against a scaffold-scoped config; see
 :mod:`devforge.stages.vertical_slice_implementer` and
@@ -72,6 +74,10 @@ from devforge.stages.prd_intake import (
     save_out_of_scope,
     save_product_summary,
 )
+from devforge.stages.release_packaging import (
+    ReleasePackage,
+    package_release,
+)
 from devforge.stages.requirements_schema import (
     Requirements,
     RequirementsError,
@@ -118,6 +124,7 @@ _STAGE_IDS = [
     "backlog_generation",
     "backlog_implementation",
     "acceptance_coverage_calculation",
+    "release_packaging",
 ]
 
 
@@ -401,6 +408,41 @@ def run_app_from_prd_workflow(
         artifact_ref="acceptance_coverage.json",
     )
 
+    # Stage 12: release_packaging (DEVF-071)
+    state_store.save_step("release_packaging", "running")
+    release = package_release(
+        run_ctx,
+        intake=intake,
+        reqs=reqs,
+        scope=scope,
+        inventory=inventory,
+        arch=arch,
+        scaffold_manifest=manifest,
+        slice_plan=slice_plan,
+        slice_result=vsi_result,
+        backlog=backlog,
+        backlog_progress=backlog_progress,
+        coverage=coverage,
+    )
+    if release.decision == "skipped":
+        state_store.save_step(
+            "release_packaging",
+            "skipped",
+            note=release.reason or None,
+        )
+    elif release.decision == "failed":
+        state_store.save_step(
+            "release_packaging",
+            "failed",
+            note=release.reason or None,
+        )
+    else:
+        state_store.save_step(
+            "release_packaging",
+            "completed",
+            artifact_ref="release/",
+        )
+
     _write_final_report(
         run_ctx,
         intake,
@@ -414,6 +456,7 @@ def run_app_from_prd_workflow(
         backlog,
         backlog_progress,
         coverage,
+        release,
     )
 
 
@@ -449,6 +492,7 @@ def _write_final_report(
     backlog: Backlog | None = None,
     backlog_progress: BacklogProgress | None = None,
     acceptance: AcceptanceCoverage | None = None,
+    release: ReleasePackage | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append(f"# Final Report — run {run_ctx.run_id}")
@@ -600,6 +644,23 @@ def _write_final_report(
             lines.append(f"- Per-task status: {breakdown}")
         if backlog_progress.reason:
             lines.append(f"- Reason: {backlog_progress.reason}")
+        lines.append("")
+
+    if release is not None:
+        lines.append("## Release package")
+        lines.append("")
+        lines.append(f"- Decision: **{release.decision}**")
+        if release.decision == "completed":
+            lines.append(
+                f"- Files written under `{release.release_root}/`: "
+                + ", ".join(f"`{name}`" for name in release.files)
+            )
+            lines.append(
+                f"- Deployable as-is: "
+                f"**{'yes' if release.deployable else 'no'}**"
+            )
+        elif release.reason:
+            lines.append(f"- Reason: {release.reason}")
         lines.append("")
 
     if acceptance is not None:

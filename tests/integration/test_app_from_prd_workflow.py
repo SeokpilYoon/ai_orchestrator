@@ -1,4 +1,4 @@
-"""Integration coverage for the app_from_prd workflow (DEVF-060..070)."""
+"""Integration coverage for the app_from_prd workflow (DEVF-060..071)."""
 from __future__ import annotations
 
 import json
@@ -140,8 +140,8 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
     assert run["status"] == "completed"
     steps = {s["stage_id"]: s["status"] for s in state.load_steps()}
     # No implementer role in this cfg, so the slice implementer + backlog
-    # implementer both skip cleanly. The backlog generator and acceptance
-    # coverage calculator are deterministic and always complete.
+    # implementer both skip cleanly. The deterministic stages (backlog
+    # generator, acceptance coverage, release packaging) still complete.
     assert steps == {
         "prd_intake": "completed",
         "requirements_inventory": "completed",
@@ -154,7 +154,21 @@ def test_full_run_writes_all_artifacts(tmp_path: Path) -> None:
         "backlog_generation": "completed",
         "backlog_implementation": "skipped",
         "acceptance_coverage_calculation": "completed",
+        "release_packaging": "completed",
     }
+
+    # Release package: all five docs are present even when nothing was
+    # accepted. The packager flags `deployable=False` because must-have
+    # coverage is 0%.
+    release_root = ctx.root / "release"
+    for name in (
+        "README.md",
+        "deployment.md",
+        "release_notes.md",
+        "qa_report.md",
+        "final_report.md",
+    ):
+        assert (release_root / name).exists(), f"missing release doc: {name}"
 
     # Acceptance coverage: nothing was accepted, so coverage is 0/total.
     cov = json.loads(
@@ -222,6 +236,7 @@ def test_empty_prd_fails_at_intake(tmp_path: Path) -> None:
     assert steps["backlog_generation"] == "pending"
     assert steps["backlog_implementation"] == "pending"
     assert steps["acceptance_coverage_calculation"] == "pending"
+    assert steps["release_packaging"] == "pending"
 
 
 def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
@@ -250,6 +265,7 @@ def test_zero_functional_requirements_fails(tmp_path: Path) -> None:
     assert steps["backlog_generation"] == "pending"
     assert steps["backlog_implementation"] == "pending"
     assert steps["acceptance_coverage_calculation"] == "pending"
+    assert steps["release_packaging"] == "pending"
     # PRD intake artifacts still written
     assert (ctx.root / "product_summary.md").exists()
     assert (ctx.root / "ambiguity_log.json").exists()
@@ -456,6 +472,24 @@ def test_slice_implementer_accepts_and_syncs_back(
     assert by_fr["FR-002"]["source_task_ids"] == ["TASK-002"]
     assert cov["overall"]["coverage"] == 1.0
     assert steps["acceptance_coverage_calculation"] == "completed"
+    assert steps["release_packaging"] == "completed"
+
+    # With FR-001 + FR-002 both covered, the release package should report
+    # the app as deployable and write all five docs under release/.
+    release_root = ctx.root / "release"
+    for name in (
+        "README.md",
+        "deployment.md",
+        "release_notes.md",
+        "qa_report.md",
+        "final_report.md",
+    ):
+        assert (release_root / name).exists()
+    readme = (release_root / "README.md").read_text(encoding="utf-8")
+    assert "Install" in readme and "uvicorn" in readme
+    # The QA report's per-FR table includes both delivered FRs.
+    qa = (release_root / "qa_report.md").read_text(encoding="utf-8")
+    assert "FR-001" in qa and "FR-002" in qa
 
     # Final report mentions the slice implementation.
     final = (ctx.root / "final_report.md").read_text(encoding="utf-8")

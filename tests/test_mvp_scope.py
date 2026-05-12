@@ -41,9 +41,11 @@ def test_standing_out_of_scope_entries_added() -> None:
     intake = PrdIntake(out_of_scope=["Authentication"], target_users=["devs"])
     reqs = Requirements(functional=[_fr(1, "must")])
     scope = freeze_mvp_scope(reqs, intake)
+    # PRD-declared out-of-scope items pass through unchanged.
     assert "Authentication" in scope.out_of_scope
-    assert any("Release packaging" in item for item in scope.out_of_scope)
-    assert any("DEVF-071" in item for item in scope.out_of_scope)
+    # The app_from_prd pipeline now covers DEVF-060..071 so no standing
+    # "deferred" entries are appended by mvp_scope.
+    assert scope.out_of_scope == ["Authentication"]
 
 
 def test_target_users_missing_adds_assumption() -> None:

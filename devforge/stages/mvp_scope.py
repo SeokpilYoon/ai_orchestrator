@@ -17,12 +17,11 @@ from devforge.stages.requirements_schema import (
     Requirements,
 )
 
-_STANDING_OUT_OF_SCOPE = [
-    "Release packaging (DEVF-071) — not in this MVP cycle",
-]
+_STANDING_OUT_OF_SCOPE: list[str] = []
 
 _NEXT_CYCLE = [
-    "DEVF-071: app packaging / release handoff",
+    "Local dashboard (DEVF-082/083) — visualise app_from_prd runs",
+    "SQLite state store (DEVF-080) — replace JSON state files",
 ]
 
 
