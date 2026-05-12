@@ -44,10 +44,15 @@ def _build_provider(provider_id: str, cfg: ProviderConfig) -> AgentProvider:
 
         return ClaudeCliProvider(provider_id, cfg)
     if cfg.type == "claude_agent_sdk":
-        # SDK adapter is deferred to Phase 2+. Treat as not-yet-implemented.
-        from devforge.providers.claude_cli import ClaudeCliProvider
+        from devforge.providers.claude_agent_sdk import (
+            ClaudeAgentSdkProvider,
+            ClaudeAgentSdkUnavailable,
+        )
 
-        return ClaudeCliProvider(provider_id, cfg)
+        try:
+            return ClaudeAgentSdkProvider(provider_id, cfg)
+        except ClaudeAgentSdkUnavailable as exc:
+            raise ValueError(str(exc)) from exc
     if cfg.type == "openai_api":
         from devforge.providers.openai_api import (
             OpenAiApiProvider,

@@ -10,7 +10,7 @@ These DEVF tasks pass tests and are wired into the CLI:
 | Area | DEVF | Notes |
 |---|---|---|
 | Repo / config / CLI | 001, 003, 010, 011, 012, 013 | repo skeleton, Pydantic config, Typer CLI, run context, workflow engine (feature only), JSON state store |
-| Providers | 020, 021, 022, 023, 024 | base interface, registry, Codex CLI adapter, Claude CLI adapter, local rule-based provider. The `openai_api` provider type now ships a real Chat Completions adapter (text-only — reviewer/judge roles); install with `pip install '.[providers-openai]'` |
+| Providers | 020, 021, 022, 023, 024 | base interface, registry, Codex CLI adapter, Claude CLI adapter, local rule-based provider. The `openai_api` provider type ships a real Chat Completions adapter and `claude_agent_sdk` ships a real Anthropic Messages adapter (both text-only — reviewer/judge roles). Install with `pip install '.[providers-openai]'` / `'.[providers-anthropic]'` |
 | Git / validation | 030, 031, 032 | worktree manager, diff collector, validation runner |
 | Policy / evaluation | 033, 034, 035, 036, 037, 038 | file policy, command policy, secret scanner, test mutation checker, score calculator, judge |
 | Feature workflow stages | 040, 041, 042, 043, 044, 045, 046 | task normalizer, repo context collector, plan generator, implementer + reviewer stages, revision loop, final report |
@@ -34,7 +34,6 @@ These DEVF tasks pass tests and are wired into the CLI:
 |---|---|---|
 | Local dashboard frontend | 083 | no React/TUI yet — DEVF-082 backend ships, ready for a client to consume |
 | Generic workflow dispatcher | (architecture §5.2) | `WorkflowEngine` only registers handlers for `feature` and `app_from_prd`. `bugfix`, `refactor`, `code_review_only`, and `research_optimize` workflows are listed in spec but not executable |
-| Claude Agent SDK provider | (architecture §5.5) | same — `providers.claude_agent_sdk` falls back to the Claude CLI adapter |
 | mypy strict pass | — | currently `mypy` runs in non-strict mode; type coverage is partial |
 | CI for real provider smoke | — | opt-in suite is local-only; no automated runner for `pytest -m real_provider` |
 | PyPI publish | post-095 | the release process is editable install + local wheel build; no automated upload pipeline yet |

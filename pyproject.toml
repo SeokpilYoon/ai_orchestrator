@@ -40,6 +40,7 @@ dev = [
     # Provider SDK test deps — adapters use monkey-patched fakes in tests,
     # but listing the real packages here keeps the lazy imports resolvable.
     "openai>=1.30",
+    "anthropic>=0.30",
 ]
 dashboard = [
     "fastapi>=0.110",
@@ -47,6 +48,9 @@ dashboard = [
 ]
 providers-openai = [
     "openai>=1.30",
+]
+providers-anthropic = [
+    "anthropic>=0.30",
 ]
 
 [project.scripts]
