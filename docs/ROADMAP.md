@@ -17,7 +17,8 @@ These DEVF tasks pass tests and are wired into the CLI:
 | App-from-PRD pipeline | 060 – 071 | Full sequence: PRD intake, requirements schema, MVP scope freeze, UX flow / screen inventory, architecture generator, scaffold generator, vertical slice planner, vertical slice implementer, backlog generator, backlog implementation loop, acceptance coverage calculator, release packaging. `python-fastapi-only` scaffold ships a runnable FastAPI skeleton under `<run_root>/scaffold/`; other stacks are recorded as `skipped`. The vertical slice and backlog implementers reuse the `feature` pipeline (implementer → validation → reviewer → judge → revisions) against an isolated git repo inside `<run_root>/scaffold/` and sync accepted candidate files back into the scaffold tree. Validation is intentionally `python -m compileall` only so it works without installing scaffold dependencies — extend `cfg.validation` for stronger gates. The acceptance coverage calculator emits per-FR coverage with `slice`/`backlog`/`none` attribution. The release packaging stage emits `<run_root>/release/{README, deployment, release_notes, qa_report, final_report}.md` — a handoff bundle a new user can read to install, run, and assess the generated app |
 | Routing & coordination | 050, 051, 052, 053, 054 | role router (incl. capability filtering), failure classifier, fallback executor, tournament mode, candidate comparison |
 | State store | 013, 080 | per-run JSON state under `.orchestrator/runs/<id>/state/` (DEVF-013) plus a project-level SQLite index at `.orchestrator/state.db` (DEVF-080). The SQLite index mirrors every JSON write — runs, steps, candidates, evaluations, provider_status — so cross-run queries answer without walking the filesystem. JSON remains authoritative per run; SQLite is best-effort and silently degrades when unavailable |
-| Report polish | 081 | `devforge report` markdown / json / state output |
+| Report polish | 081 | `devforge report` markdown / json / state output; `devforge report --list` enumerates runs via the SQLite index with `--workflow`/`--limit`/`--format` filters |
+| Local dashboard backend | 082 | Read-only FastAPI app over the SQLite index (DEVF-080) + per-run JSON artifacts. Routes: `/api/runs`, `/api/runs/{id}`, `/api/runs/{id}/candidates[/{cid}[/diff]]`, `/api/runs/{id}/providers`, `/api/healthz`, plus a minimal HTML index at `/`. Served via `devforge dashboard --host --port`. FastAPI/uvicorn are optional extras (`pip install '.[dashboard]'`) so the core CLI stays slim |
 | Tests | 090, 091, 092, 093 | unit suite, mock integration suite, opt-in real provider smoke, security regression |
 | Packaging | 095 | wheel/sdist build via `pyproject.toml`, console-script entry point, `devforge --version` + `devforge version`, `CHANGELOG.md`, `docs/RELEASE_NOTES.md`. PyPI publish is **not implemented yet** (see below) |
 
@@ -25,15 +26,13 @@ These DEVF tasks pass tests and are wired into the CLI:
 
 | Area | DEVF | Gap |
 |---|---|---|
-| Directory layout | 002 | `devforge/dashboard/` directory does not exist yet |
 | Documentation | 094 | covered by an earlier cycle; future expansion (HOWTOs, tutorials) deferred |
 
 ## Not implemented yet
 
 | Area | DEVF | Status |
 |---|---|---|
-| Local dashboard backend | 082 | no FastAPI/web layer yet |
-| Local dashboard frontend | 083 | no React/TUI yet |
+| Local dashboard frontend | 083 | no React/TUI yet — DEVF-082 backend ships, ready for a client to consume |
 | Generic workflow dispatcher | (architecture §5.2) | `WorkflowEngine` only registers handlers for `feature` and `app_from_prd`. `bugfix`, `refactor`, `code_review_only`, and `research_optimize` workflows are listed in spec but not executable |
 | OpenAI API provider | (architecture §5.5) | `providers.openai_api` type is accepted by config but the registry delegates it to the Codex CLI adapter as a placeholder |
 | Claude Agent SDK provider | (architecture §5.5) | same — `providers.claude_agent_sdk` falls back to the Claude CLI adapter |

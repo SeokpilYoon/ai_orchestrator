@@ -248,6 +248,33 @@ def create_app(
 
 
 # ---------------------------------------------------------------------------
+# dashboard (DEVF-082)
+# ---------------------------------------------------------------------------
+
+@app.command()
+def dashboard(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8765, "--port"),
+    config: Path = typer.Option(Path("devforge.yaml"), "--config", "-c"),
+) -> None:
+    """Serve the read-only dashboard backend over HTTP."""
+    from devforge.core.config_loader import ConfigError, load_config
+
+    try:
+        cfg = load_config(config)
+    except ConfigError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    try:
+        from devforge.dashboard.backend import DashboardImportError, serve
+        serve(Path(cfg.project.root), host=host, port=port)
+    except DashboardImportError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+
+# ---------------------------------------------------------------------------
 # report
 # ---------------------------------------------------------------------------
 
