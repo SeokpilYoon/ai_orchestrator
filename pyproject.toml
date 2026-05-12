@@ -151,3 +151,10 @@ markers = [
     "slow: slow tests",
     "real_provider: smoke tests that require an installed Codex/Claude CLI (opt-in; see docs/REAL_PROVIDER_SMOKE.md)",
 ]
+
+[project.urls]
+Repository = "https://github.com/SeokpilYoon/ai_orchestrator"
+Source = "https://github.com/SeokpilYoon/ai_orchestrator"
+Issues = "https://github.com/SeokpilYoon/ai_orchestrator/issues"
+Changelog = "https://github.com/SeokpilYoon/ai_orchestrator/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/SeokpilYoon/ai_orchestrator/blob/main/README.md"
