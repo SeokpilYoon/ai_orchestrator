@@ -10,21 +10,40 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "AI Dev Orchestrator Contributors" }]
-keywords = ["claude-code", "codex", "agent", "orchestrator", "llm"]
+keywords = [
+    "claude-code",
+    "codex",
+    "agent",
+    "orchestrator",
+    "llm",
+    "code-generation",
+    "code-review",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3 :: Only",
     "Topic :: Software Development",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
 ]
 dependencies = [
     "typer>=0.12",
     "pydantic>=2.6",
     "pyyaml>=6.0",
 ]
+
+# Project URLs are intentionally omitted until the public repository
+# location is finalised. See docs/RELEASE_CHECKLIST.md — the first
+# pre-publish step is to add the canonical Repository / Documentation /
+# Changelog / Issues URLs here so PyPI's project page is useful.
 
 [project.optional-dependencies]
 dev = [
