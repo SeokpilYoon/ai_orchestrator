@@ -180,6 +180,8 @@ def run_backlog_implementer(
         return progress
 
     registry = ProviderRegistry.from_config(scaffold_cfg)
+    from devforge.core.state_store import StateStore as _StateStore  # noqa: PLC0415
+    _StateStore(run_ctx.root).snapshot_provider_registry(registry)
     router = RoleRouter(scaffold_cfg, registry)
 
     impl_decision = router.select("implementer", override=implementer_override)

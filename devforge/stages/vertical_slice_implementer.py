@@ -435,6 +435,10 @@ def run_vertical_slice_implementer(
         )
 
     registry = ProviderRegistry.from_config(scaffold_cfg)
+    # Best-effort: mirror the scaffold-scoped provider health into the
+    # project-level SQLite index. The state store guards against errors.
+    from devforge.core.state_store import StateStore as _StateStore  # noqa: PLC0415
+    _StateStore(run_ctx.root).snapshot_provider_registry(registry)
     router = RoleRouter(scaffold_cfg, registry)
 
     impl_decision = router.select("implementer", override=implementer_override)

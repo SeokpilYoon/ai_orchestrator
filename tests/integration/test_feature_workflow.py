@@ -112,6 +112,35 @@ def test_accept_on_clean_patch(
     assert "mock_impl" in final
     assert "accept" in decision
 
+    # DEVF-080: every JSON write also mirrors into <project>/.orchestrator/state.db.
+    # (This test calls the driver directly without WorkflowEngine, so the
+    # run row stays at "pending" — the index still records every other
+    # facet of the run.)
+    from devforge.core.sqlite_index import SqliteIndex
+    idx = SqliteIndex(repo / ".orchestrator" / "state.db")
+    runs = idx.list_runs(workflow="feature")
+    assert any(r["run_id"] == ctx.run_id for r in runs)
+    run_row = idx.get_run(ctx.run_id)
+    assert run_row is not None
+    assert run_row["chosen_candidate"] == "mock_impl"
+    steps = idx.get_steps(ctx.run_id)
+    assert {s["stage_id"] for s in steps} >= {
+        "normalize_task", "inspect_repo", "plan", "implement_candidates",
+        "comparison_report", "final_report",
+    }
+    cands = idx.get_candidates(ctx.run_id)
+    # The candidate row mirrors save_candidate's decision verdict; the
+    # exact verdict depends on the score gate (the test config keeps the
+    # default min_score=85, so this candidate may land at the
+    # "keep_candidate_but_continue" / "accept" boundary). We only care
+    # that the row exists with a non-null decision.
+    assert any(
+        c["candidate_id"] == "mock_impl" and c["decision"] is not None
+        for c in cands
+    )
+    statuses = idx.get_provider_status(ctx.run_id)
+    assert any(s["provider_id"] == "mock_impl" for s in statuses)
+
 
 def test_discard_on_blocked_file(
     base_config: DevforgeConfig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

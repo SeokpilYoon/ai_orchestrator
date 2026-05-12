@@ -82,6 +82,7 @@ def run_feature_workflow(
             )
 
     registry = ProviderRegistry.from_config(cfg)
+    state_store.snapshot_provider_registry(registry)
     router = RoleRouter(cfg, registry)
     worktree_mgr = WorktreeManager(
         repo_root=Path(cfg.project.root),
