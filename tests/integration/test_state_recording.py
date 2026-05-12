@@ -126,20 +126,15 @@ def test_engine_marks_failed_run_on_empty_plan(
 def test_unknown_workflow_marks_run_failed(
     base_config: DevforgeConfig, tmp_path: Path
 ) -> None:
-    """Engine returns a clear error and records run.status=failed for unknown workflow.
-
-    ``research_optimize`` is still unimplemented (no yaml + no driver) so it
-    is the canonical "unknown workflow" for this assertion. ``bugfix``/
-    ``refactor`` now ship as feature-driver variants — see DEVF-082 work.
-    """
+    """Engine returns a clear error and records run.status=failed for unknown workflow."""
     repo = Path(base_config.project.root)
     ctx = create_run_context(
-        repo, workflow="research_optimize", input_path=_task_md(tmp_path)
+        repo, workflow="this_workflow_does_not_exist", input_path=_task_md(tmp_path)
     )
     engine = WorkflowEngine(base_config, ctx)
 
     with pytest.raises(WorkflowLoadError, match="not found|no engine handler"):
-        engine.run("research_optimize")
+        engine.run("this_workflow_does_not_exist")
 
     state = StateStore(ctx.root)
     run = state.load_run()

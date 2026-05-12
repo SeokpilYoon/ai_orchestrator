@@ -202,8 +202,9 @@ def test_unknown_workflow_still_raises(
     task = tmp_path / "task.md"
     task.write_text("# x\n", encoding="utf-8")
     repo = Path(base_config.project.root)
-    ctx = create_run_context(repo, workflow="research_optimize", input_path=task)
+    # research_optimize is now implemented — use a clearly nonexistent id.
+    ctx = create_run_context(repo, workflow="this_workflow_does_not_exist", input_path=task)
     from devforge.core.workflow_engine import WorkflowLoadError
     engine = WorkflowEngine(base_config, ctx)
     with pytest.raises(WorkflowLoadError):
-        engine.run("research_optimize")
+        engine.run("this_workflow_does_not_exist")

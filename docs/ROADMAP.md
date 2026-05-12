@@ -33,7 +33,7 @@ These DEVF tasks pass tests and are wired into the CLI:
 | Area | DEVF | Status |
 |---|---|---|
 | Local dashboard frontend | 083 | no React/TUI yet — DEVF-082 backend ships, ready for a client to consume |
-| Generic workflow dispatcher | (architecture §5.2) | `WorkflowEngine` registers handlers for `feature`, `bugfix`, `refactor`, `code_review_only`, and `app_from_prd`. `bugfix`/`refactor` share the feature driver with workflow-specific prompt framing. `code_review_only` reviews an existing diff (working tree / staged / ref range / patch file) without invoking an implementer. `research_optimize` is still pending |
+| Generic workflow dispatcher | (architecture §5.2) | `WorkflowEngine` registers handlers for all six spec workflows: `feature`, `bugfix`, `refactor`, `code_review_only`, `research_optimize`, and `app_from_prd`. `research_optimize` runs a bounded inspect → hypothesise → (optionally implement) → verify cycle around a user-supplied metric command |
 | mypy strict pass | — | currently `mypy` runs in non-strict mode; type coverage is partial |
 | CI for real provider smoke | — | opt-in suite is local-only; no automated runner for `pytest -m real_provider` |
 | PyPI publish | post-095 | the release process is editable install + local wheel build; no automated upload pipeline yet |

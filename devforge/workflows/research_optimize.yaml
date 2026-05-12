@@ -1,0 +1,35 @@
+workflow: research_optimize
+# Bounded research-and-improve cycle: inspect a target area, capture a
+# baseline metric, generate deterministic hypotheses, optionally run a
+# small experiment, then re-measure and decide keep/reject. See
+# ``devforge/stages/research_optimize_driver.py``. The metric is supplied
+# by the user via run metadata so the workflow stays project-agnostic.
+stages:
+  - id: target_inspection
+    role: technical_planner
+    mode: read_only
+    output: research_inspection.json
+
+  - id: baseline_measurement
+    role: technical_planner
+    mode: read_only
+    output: research_baseline.json
+
+  - id: hypothesis_generation
+    role: technical_planner
+    mode: read_only
+    output: research_hypotheses.json
+
+  - id: experiment
+    role: implementer
+    mode: single
+    output: research_experiment.json
+
+  - id: verify_metric
+    role: technical_planner
+    mode: read_only
+    output: research_verify.json
+
+  - id: final_report
+    type: local_writer
+    output: research_report.json
