@@ -37,10 +37,16 @@ dev = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
     "httpx>=0.27",
+    # Provider SDK test deps — adapters use monkey-patched fakes in tests,
+    # but listing the real packages here keeps the lazy imports resolvable.
+    "openai>=1.30",
 ]
 dashboard = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
+]
+providers-openai = [
+    "openai>=1.30",
 ]
 
 [project.scripts]

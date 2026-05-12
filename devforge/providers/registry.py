@@ -49,10 +49,15 @@ def _build_provider(provider_id: str, cfg: ProviderConfig) -> AgentProvider:
 
         return ClaudeCliProvider(provider_id, cfg)
     if cfg.type == "openai_api":
-        # OpenAI API adapter is deferred. Use Codex CLI shape for now.
-        from devforge.providers.codex_cli import CodexCliProvider
+        from devforge.providers.openai_api import (
+            OpenAiApiProvider,
+            OpenAiApiUnavailable,
+        )
 
-        return CodexCliProvider(provider_id, cfg)
+        try:
+            return OpenAiApiProvider(provider_id, cfg)
+        except OpenAiApiUnavailable as exc:
+            raise ValueError(str(exc)) from exc
     if cfg.type == "local_rule_based":
         from devforge.providers.local_rule_based import LocalRuleBasedProvider
 
