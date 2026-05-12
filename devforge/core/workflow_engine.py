@@ -286,6 +286,8 @@ class WorkflowEngine:
                 run_app_from_prd_workflow(
                     self.cfg,
                     self.run_ctx,
+                    implementer_override=implementer_override,
+                    reviewer_override=reviewer_override,
                     state_store=self.state_store,
                     definition=definition,
                 )

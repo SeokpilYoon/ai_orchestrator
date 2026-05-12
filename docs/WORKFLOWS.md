@@ -156,15 +156,43 @@ planning stages and writes artifacts to a new run directory:
   produce a manifest with `supported=false` and **no files are written**.
   The output is always isolated under `<run_root>/scaffold/` — the host
   repository is never touched.
+- `vertical_slice_planner` → `vertical_slice_plan.json`. Deterministic
+  narrowing: picks the first must-have flow in navigation order as the
+  anchor, greedily attaches up to two more flows that share a data entity
+  with the anchor (cap of three flows total), and emits
+  `vertical_slice_name`, `user_journey`, `screens`, `api_endpoints`,
+  `data_entities`, and `acceptance_criteria`. When a PRD has no must-have
+  FRs the planner falls back to `should`, then `could`, recording the
+  fallback in the plan's `notes`.
+- `vertical_slice_implementer` → `vertical_slice_result.json` and
+  accepted candidate files synced back into `<run_root>/scaffold/`.
+  Reuses the `feature`-pipeline candidate loop (implementer → validation
+  → reviewer → judge → up to `cfg.mode.max_iterations_per_task`
+  revisions) — see `devforge/stages/candidate_loop.py`. The scaffold is
+  initialised as an isolated git repo at `<run_root>/scaffold/.git/` and
+  worktrees live under `<run_root>/scaffold_worktrees/` — no git state
+  ever escapes the run directory. On `accept`, the candidate's changed
+  files are copied (not merged) back into `<run_root>/scaffold/`.
+  **Validation is intentionally lightweight**: only
+  `python -m compileall -q app tests` runs by default, so the stage
+  works without installing scaffold dependencies. The result JSON
+  surfaces this limitation in its `notes` field — extend `cfg.validation`
+  in `devforge.yaml` if you want stronger gates (e.g. running the
+  scaffold's `pytest` after `pip install -e .[dev]`). The stage skips
+  cleanly with a recorded reason when the scaffold stack is
+  unsupported, the scaffold's import smoke failed, the slice has no
+  acceptance criteria, or no implementer provider is healthy. Override
+  the implementer / reviewer providers with `--implementer` and
+  `--reviewer` on `devforge create-app`.
 
 The PRD is a markdown file with `## Functional requirements`,
 `## Non-functional requirements`, and (optionally) `## Out of scope`
 sections. See [`../examples/prds/sample_todo_app.md`](../examples/prds/sample_todo_app.md).
 
-Subsequent stages (vertical slice, backlog loop, release packaging —
-DEVF-066 to DEVF-071) are **not yet implemented**. The `--stack`
-argument drives the scaffold generator profile but no other downstream
-generator yet.
+Subsequent stages (backlog loop, acceptance coverage, release
+packaging — DEVF-068 to DEVF-071) are **not yet implemented**. The
+`--stack` argument drives the scaffold generator profile but no other
+downstream generator yet.
 
 Empty PRDs and PRDs with zero functional requirements abort the workflow:
 a `failure.json` is written and the corresponding step in `state/steps.json`

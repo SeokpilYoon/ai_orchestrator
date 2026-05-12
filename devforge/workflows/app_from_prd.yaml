@@ -1,7 +1,8 @@
 workflow: app_from_prd
-# Foundation + UX inventory + architecture planning + scaffold. Vertical
-# slice, backlog implementation, QA, and release packaging are deferred to
-# future cycles (DEVF-066..071 — see docs/ROADMAP.md).
+# Foundation + UX inventory + architecture planning + scaffold + vertical
+# slice planner + vertical slice implementer. Backlog implementation, QA,
+# and release packaging are deferred to future cycles (DEVF-068..071 —
+# see docs/ROADMAP.md).
 stages:
   - id: prd_intake
     role: product_manager
@@ -32,3 +33,13 @@ stages:
     role: implementer
     mode: read_only
     output: scaffold_manifest.json
+
+  - id: vertical_slice_planner
+    role: product_manager
+    mode: read_only
+    output: vertical_slice_plan.json
+
+  - id: vertical_slice_implementer
+    role: implementer
+    mode: single
+    output: vertical_slice_result.json

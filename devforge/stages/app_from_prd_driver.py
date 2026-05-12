@@ -1,6 +1,6 @@
-"""Driver for the ``app_from_prd`` workflow (DEVF-060..065).
+"""Driver for the ``app_from_prd`` workflow (DEVF-060..067).
 
-Six deterministic stages — no provider / no worktree / no judge:
+Seven deterministic stages plus one provider-driven implementation stage:
 
 1. ``prd_intake`` → ``product_summary.md`` + ``ambiguity_log.json``
    + ``assumptions.md`` + ``out_of_scope.md``
@@ -11,6 +11,14 @@ Six deterministic stages — no provider / no worktree / no judge:
 5. ``architecture_design`` → ``architecture.md`` + ``data_model.md``
    + ``api_contract.yaml`` + ``tech_stack.md``
 6. ``scaffold_generation`` → ``scaffold/`` + ``scaffold_manifest.json``
+7. ``vertical_slice_planner`` → ``vertical_slice_plan.json``
+8. ``vertical_slice_implementer`` → ``vertical_slice_result.json`` +
+   accepted candidate files synced back into ``scaffold/``
+
+Stages 1–7 are deterministic. Stage 8 runs the existing feature-pipeline
+candidate loop (implementer → validation → reviewer → judge → revisions)
+against a scaffold-scoped config; see
+:mod:`devforge.stages.vertical_slice_implementer`.
 
 A short ``final_report.md`` is also written so ``devforge report --latest``
 shows a useful summary.
@@ -60,6 +68,20 @@ from devforge.stages.ux_flow import (
     save_screen_inventory,
     save_user_flows,
 )
+from devforge.stages.vertical_slice_implementer import (
+    VerticalSliceImplementerResult,
+    run_vertical_slice_implementer,
+    save_vertical_slice_result,
+)
+from devforge.stages.vertical_slice_implementer import (
+    skip_reason as _vsi_skip_reason,
+)
+from devforge.stages.vertical_slice_planner import (
+    VerticalSlicePlan,
+    VerticalSlicePlannerError,
+    plan_vertical_slice,
+    save_vertical_slice_plan,
+)
 
 _STAGE_IDS = [
     "prd_intake",
@@ -68,6 +90,8 @@ _STAGE_IDS = [
     "ux_flow_inventory",
     "architecture_design",
     "scaffold_generation",
+    "vertical_slice_planner",
+    "vertical_slice_implementer",
 ]
 
 
@@ -75,6 +99,8 @@ def run_app_from_prd_workflow(
     cfg: DevforgeConfig,
     run_ctx: RunContext,
     *,
+    implementer_override: str | None = None,
+    reviewer_override: str | None = None,
     state_store: StateStore | None = None,
     definition: Any = None,  # devforge.core.workflow_engine.WorkflowDefinition
 ) -> None:
@@ -198,7 +224,92 @@ def run_app_from_prd_workflow(
             "scaffold_generation", "completed", artifact_ref="scaffold/"
         )
 
-    _write_final_report(run_ctx, intake, reqs, scope, inventory, arch, manifest)
+    # Stage 7: vertical_slice_planner (DEVF-066)
+    state_store.save_step("vertical_slice_planner", "running")
+    try:
+        slice_plan = plan_vertical_slice(reqs, intake, scope, inventory, arch)
+    except VerticalSlicePlannerError as exc:
+        state_store.save_step(
+            "vertical_slice_planner", "failed", note=str(exc)
+        )
+        _write_failure(
+            run_ctx, "vertical slice planning failed", {"reason": str(exc)}
+        )
+        return
+    save_vertical_slice_plan(
+        slice_plan, run_ctx.root / "vertical_slice_plan.json"
+    )
+    state_store.save_step(
+        "vertical_slice_planner",
+        "completed",
+        artifact_ref="vertical_slice_plan.json",
+    )
+
+    # Stage 8: vertical_slice_implementer (DEVF-067)
+    state_store.save_step("vertical_slice_implementer", "running")
+    vsi_skip = _vsi_skip_reason(manifest, slice_plan)
+    if vsi_skip is not None:
+        vsi_result = VerticalSliceImplementerResult(
+            decision="skipped", reason=vsi_skip
+        )
+        save_vertical_slice_result(
+            vsi_result, run_ctx.root / "vertical_slice_result.json"
+        )
+        state_store.save_step(
+            "vertical_slice_implementer",
+            "skipped",
+            note=vsi_skip,
+        )
+    else:
+        try:
+            vsi_result = run_vertical_slice_implementer(
+                cfg,
+                run_ctx,
+                slice_plan=slice_plan,
+                arch=arch,
+                scaffold_manifest=manifest,
+                implementer_override=implementer_override,
+                reviewer_override=reviewer_override,
+            )
+        except Exception as exc:  # noqa: BLE001 — record + continue, never abort the run
+            vsi_result = VerticalSliceImplementerResult(
+                decision="failed",
+                reason=f"vertical slice implementer raised: {exc}",
+            )
+        save_vertical_slice_result(
+            vsi_result, run_ctx.root / "vertical_slice_result.json"
+        )
+        if vsi_result.decision == "skipped":
+            state_store.save_step(
+                "vertical_slice_implementer",
+                "skipped",
+                note=vsi_result.reason or None,
+            )
+        elif vsi_result.decision == "failed":
+            state_store.save_step(
+                "vertical_slice_implementer",
+                "failed",
+                note=vsi_result.reason or None,
+            )
+        else:
+            state_store.save_step(
+                "vertical_slice_implementer",
+                "completed",
+                artifact_ref="vertical_slice_result.json",
+                note=vsi_result.reason or None,
+            )
+
+    _write_final_report(
+        run_ctx,
+        intake,
+        reqs,
+        scope,
+        inventory,
+        arch,
+        manifest,
+        slice_plan,
+        vsi_result,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -228,6 +339,8 @@ def _write_final_report(
     inventory: UxInventory | None = None,
     arch: Architecture | None = None,
     scaffold: ScaffoldManifest | None = None,
+    slice_plan: VerticalSlicePlan | None = None,
+    slice_result: VerticalSliceImplementerResult | None = None,
 ) -> None:
     lines: list[str] = []
     lines.append(f"# Final Report — run {run_ctx.run_id}")
@@ -282,6 +395,60 @@ def _write_final_report(
         )
         lines.append("")
 
+    if slice_plan is not None:
+        lines.append("## Vertical slice")
+        lines.append("")
+        lines.append(f"- Name: **{slice_plan.vertical_slice_name}**")
+        if slice_plan.requirement_ids:
+            lines.append(
+                f"- Requirements: {', '.join(slice_plan.requirement_ids)}"
+            )
+        lines.append(
+            f"- Screens: **{len(slice_plan.screens)}**, "
+            f"endpoints: **{len(slice_plan.api_endpoints)}**, "
+            f"entities: **{len(slice_plan.data_entities)}**, "
+            f"acceptance criteria: **{len(slice_plan.acceptance_criteria)}**"
+        )
+        lines.append("")
+
+    if slice_result is not None:
+        lines.append("## Vertical slice implementation")
+        lines.append("")
+        lines.append(f"- Decision: **{slice_result.decision}**")
+        if slice_result.candidate_id:
+            lines.append(
+                f"- Candidate: `{slice_result.candidate_id}` "
+                f"(provider `{slice_result.provider_id}`)"
+            )
+        if slice_result.reviewer_provider_id:
+            lines.append(
+                f"- Reviewer: `{slice_result.reviewer_provider_id}` "
+                f"(verdict: {slice_result.reviewer_verdict or 'n/a'})"
+            )
+        if slice_result.score is not None:
+            lines.append(f"- Score: **{slice_result.score:.1f}**")
+        if slice_result.changed_files:
+            sample = ", ".join(slice_result.changed_files[:5])
+            extra = (
+                f", ... ({len(slice_result.changed_files) - 5} more)"
+                if len(slice_result.changed_files) > 5
+                else ""
+            )
+            lines.append(f"- Changed files: {sample}{extra}")
+        lines.append(
+            f"- Synced into `scaffold/`: "
+            f"**{'yes' if slice_result.synced_to_scaffold else 'no'}**"
+        )
+        if slice_result.candidate_artifacts:
+            lines.append(f"- Artifacts: `{slice_result.candidate_artifacts}`")
+        if slice_result.reason:
+            lines.append(f"- Reason: {slice_result.reason}")
+        if slice_result.notes:
+            lines.append("- Notes:")
+            for n in slice_result.notes:
+                lines.append(f"  - {n}")
+        lines.append("")
+
     if scaffold is not None:
         lines.append("## Scaffold")
         lines.append("")
@@ -321,6 +488,8 @@ def _write_final_report(
         "api_contract.yaml",
         "tech_stack.md",
         "scaffold_manifest.json",
+        "vertical_slice_plan.json",
+        "vertical_slice_result.json",
     ):
         if (run_ctx.root / name).exists():
             lines.append(f"- `{name}`")

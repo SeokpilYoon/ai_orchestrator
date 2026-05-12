@@ -18,14 +18,11 @@ from devforge.stages.requirements_schema import (
 )
 
 _STANDING_OUT_OF_SCOPE = [
-    "Vertical slice planning and implementation (DEVF-066/067) — not in this MVP cycle",
     "Backlog implementation loop (DEVF-068/069) — not in this MVP cycle",
     "Release packaging (DEVF-071) — not in this MVP cycle",
 ]
 
 _NEXT_CYCLE = [
-    "DEVF-066: vertical slice planner",
-    "DEVF-067: vertical slice implementer",
     "DEVF-068/069: backlog generator and implementation loop",
     "DEVF-070: acceptance coverage and validation",
     "DEVF-071: app packaging / release handoff",

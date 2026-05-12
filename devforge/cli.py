@@ -186,6 +186,24 @@ def create_app(
             "other stacks are recorded as skipped."
         ),
     ),
+    implementer: str | None = typer.Option(
+        None,
+        "--implementer",
+        help=(
+            "Override the implementer provider for the vertical slice "
+            "implementer stage (DEVF-067). Defaults to the provider order "
+            "in cfg.roles['implementer']."
+        ),
+    ),
+    reviewer: str | None = typer.Option(
+        None,
+        "--reviewer",
+        help=(
+            "Override the reviewer provider for the vertical slice "
+            "implementer stage (DEVF-067). Defaults to the provider order "
+            "in cfg.roles['reviewer']."
+        ),
+    ),
     config: Path = typer.Option(Path("devforge.yaml"), "--config", "-c"),
 ) -> None:
     """Run the app_from_prd workflow and write planning plus scaffold artifacts."""
@@ -203,14 +221,22 @@ def create_app(
         project_root=Path(cfg.project.root),
         workflow="app_from_prd",
         input_path=from_,
-        extra_metadata={"stack": stack},
+        extra_metadata={
+            "stack": stack,
+            "implementer_override": implementer,
+            "reviewer_override": reviewer,
+        },
     )
     typer.echo(f"Created run: {ctx.run_id}")
     typer.echo(f"Run directory: {ctx.root}")
 
     try:
         engine = WorkflowEngine(cfg, ctx)
-        engine.run("app_from_prd")
+        engine.run(
+            "app_from_prd",
+            implementer_override=implementer,
+            reviewer_override=reviewer,
+        )
     except WorkflowLoadError as exc:
         typer.echo(f"Workflow error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
