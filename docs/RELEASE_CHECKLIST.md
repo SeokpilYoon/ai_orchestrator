@@ -179,6 +179,9 @@ user's behalf:
 | PyPI token | Credential + irreversible publish action. |
 | `git push origin vX.Y.Z` | Visible to others; outside the autonomy contract. |
 | `git push origin main` | Same. |
+| `pytest -m real_provider` | Requires a working `codex` / `claude` CLI on PATH plus valid subscription / API key. Run on a workstation that already has both before each release. |
+| `research_optimize` `experiment_mode=implement` smoke | Routes the top hypothesis through the feature driver; needs a configured implementer provider. Tested with mock providers; not yet smoked against a real LLM. |
+| Strict mypy on remaining driver modules | ~12 modules listed in `docs/TYPING.md §Not yet in the strict tier`. Move them into the overrides block as each gets enough annotations. |
 
 devforge's autonomous-mode `chore(release)` prep verifies that:
 

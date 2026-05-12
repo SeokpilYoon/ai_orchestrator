@@ -1,9 +1,11 @@
 # Workflows
 
-Only the **`feature`** workflow has an executable handler today. Spec lists
-`bugfix`, `refactor`, `code_review_only`, `app_from_prd`, and
-`research_optimize` — those are stage definitions only and not dispatched
-(see [`ROADMAP.md`](ROADMAP.md)).
+`WorkflowEngine` ships an executable handler for every workflow listed in
+the architecture spec: **`feature`**, **`bugfix`**, **`refactor`**,
+**`code_review_only`**, **`research_optimize`**, and **`app_from_prd`**.
+`bugfix` / `refactor` share the feature driver with workflow-specific
+prompt framing; the other three have dedicated drivers. See
+[`ROADMAP.md`](ROADMAP.md) for the implementation history.
 
 ## The feature workflow
 
